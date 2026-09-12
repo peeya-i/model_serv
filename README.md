@@ -82,13 +82,19 @@ This repository supports two interaction models:
     ```
     nvidia-smi
     ```
-7. Authenticate with Huggingface using API key
+7. Authenticate with Hugging Face using `.env` or CLI
+    Create a `.env` file in the project root:
+    ```bash
+    echo "HF_TOKEN=hf_your_actual_token_here" > .env
     ```
-    hf auth login --token <paste the token here>
-    ```
-8. Make the folder to store the models and download the model:
-    ```
+    *`serve_private_llm.py` will automatically read `HF_TOKEN` from `.env` to authenticate all model downloads and API checks.*
+
+8. Make the folder to store models:
+    ```bash
     mkdir models
+    ```
+    *(Optional: You can pre-download a model manually, or let `serve_private_llm.py` download models automatically when you specify them!)*
+    ```bash
     hf download meta-llama/Llama-3.2-3B-Instruct --local-dir ./models/Llama-3.2-3B-Instruct
     ```
 
@@ -99,15 +105,60 @@ Before running direct queries or starting an agent, launch the core inference se
 
 ### Virtual Environment (Recommended)
 
-Default (port 8000):
+#### Command Options & Parameters
+
+| Parameter | Shorthand | Description | Default |
+| :--- | :--- | :--- | :--- |
+| `--model <model>` | — | Model path or Hugging Face model identifier | Interactive Menu |
+| `--port <port>` | `-l <port>` | Listening port for the model server | `8000` |
+
+#### Usage Examples
+
+**1. Interactive Selection & Automatic Model Loading (when started without `--model`):**
 ```bash
 cd /home/<uname>/Documents/model_serv
 ./.venv/bin/python serve_private_llm.py
 ```
+This displays an interactive menu of local models and allows typing a new model:
+```text
+========================================================
+ Select a model to serve:
+========================================================
+  [1] models/Llama-3.2-3B-Instruct (max-model-len: 4096)
+  [2] TinyLlama/TinyLlama-1.1B-Chat-v1.0 (max-model-len: 2048)
+  [3] Enter model name and max-len manually
+========================================================
+Select an option (1-3): 
+```
 
-Custom port (using `-l <port>`):
+- **Select a local model**: Enter `1` or `2`.
+- **Automatically download and load a new model**: Enter `3`, then type the Hugging Face repository name. If the model is not already cached, it will be **automatically downloaded and loaded** using the `HF_TOKEN` from your `.env` file!
+
+##### Examples of Valid Model Names:
+| Model Type | Valid Model Name / Identifier | Suggested `max-model-len` | Notes |
+| :--- | :--- | :--- | :--- |
+| **Qwen 2.5 Coder** | `Qwen/Qwen2.5-Coder-3B-Instruct` | `4096` | High performance coding model |
+| **Qwen 2.5 Small** | `Qwen/Qwen2.5-1.5B-Instruct` | `4096` | Lightweight & fast |
+| **TinyLlama** | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | `2048` | Compact, 2048 max context |
+| **Llama 3.2** | `meta-llama/Llama-3.2-3B-Instruct` | `4096` | Requires HF gated repo access |
+| **Phi 3.5** | `microsoft/Phi-3.5-mini-instruct` | `4096` | High-accuracy 3.8B model |
+
+> [!NOTE]
+> **GPU Compatibility (Turing sm_75)**: Check the GPU on the machine and make sure it will be able to support the model being loaded. For instance, the Quadro RTX 3000 supports `float16` and `float32`, but does not have native hardware tensor cores for `bfloat16`. Models like `Llama 3.2`, `Qwen 2.5`, and `TinyLlama` support `float16` casting cleanly. However, models like `Gemma 2` forbid `float16` due to numerical instability and force `float32` upcasting, which doubles memory consumption to ~10.5 GB and exceeds 6GB VRAM.
+
+**2. Custom Listening Port (using `-l` or `--port`):**
 ```bash
 ./.venv/bin/python serve_private_llm.py -l 8500
+```
+
+**3. Direct CLI Model Launch (Automatic Download if not cached):**
+```bash
+./.venv/bin/python serve_private_llm.py --model "Qwen/Qwen2.5-Coder-3B-Instruct"
+```
+
+**4. Custom Model and Port Combined:**
+```bash
+./.venv/bin/python serve_private_llm.py --model "TinyLlama/TinyLlama-1.1B-Chat-v1.0" -l 8500
 ```
 
 *The model server initializes weights, offloads 3GB to system RAM, sets up Triton attention, and listens on `http://127.0.0.1:<port>/v1` (default: 8000).*
@@ -144,7 +195,6 @@ curl -X POST http://127.0.0.1:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-internal-secure-gateway-token-xyz" \
   -d '{
-    "model": "Llama-3.2-3B-Instruct",
     "messages": [
       {"role": "user", "content": "Explain what Retrieval-Augmented Generation (RAG) is in two sentences."}
     ],
@@ -302,10 +352,6 @@ print(answer)
   ```bash
   pkill -f "serve_private_llm.py"
   # Or: kill $(lsof -t -i:8000)
-  ```
-- If running via Docker Compose:
-  ```bash
-  docker compose down
   ```
 
 ---

@@ -55,7 +55,7 @@ This repository supports two interaction models:
 
 ---
 
-## 🛠️ Step 0: Download Models
+## 🛠️ Step 0: Setting up the Plaatform
 1. Go to huggingface.co to find the model you would like to use. Some models requires you to make a request access it. The example here is for meta-llama/Meta-Llama-3.2-3B-Instruct.
     - After the model access is granted, go back to huggingface.co again and 
 2. Create a token by following the steps below:

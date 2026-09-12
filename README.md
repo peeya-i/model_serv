@@ -21,7 +21,7 @@ This repository supports two interaction models:
                                  │                               ▼
                                  │                ┌──────────────────────────────┐
                                  │                │    Local Agent Server Front  │
-                                 │                │   (agent_server.py on :8001) │
+                                 │                │(agent/agent_server.py :8001) │
                                  │                │   - Tool Registry            │
                                  │                │   - Execution & Reason Loop  │
                                  │                └──────────────┬───────────────┘
@@ -232,7 +232,7 @@ print(response.choices[0].message.content)
 
 When you need the model to autonomously reason, decide when external data or actions are required, and execute tools, run one of the two server agent options.
 
-### Option 1: FastAPI Microservice Front (`agent_server.py`)
+### Option 1: FastAPI Microservice Front (`agent/agent_server.py`)
 
 A persistent HTTP service listening on port `8001`. It receives user prompts, passes them to the local model alongside registered tool schemas, intercepts function calls, executes the local Python functions, and returns the synthesized answer.
 
@@ -245,19 +245,19 @@ In a separate terminal:
 
 **Default ports (listen: 8001, model: 8000):**
 ```bash
-./.venv/bin/python agent_server.py
+./.venv/bin/python agent/agent_server.py
 ```
 
 **Custom ports (specify listening port `-l` and/or model server port `-m`):**
 ```bash
 # Listen on 8001, connect to model server on custom port 8500
-./.venv/bin/python agent_server.py -m 8500
+./.venv/bin/python agent/agent_server.py -m 8500
 
 # Listen on custom port 9001, connect to model server on default port 8000
-./.venv/bin/python agent_server.py -l 9001
+./.venv/bin/python agent/agent_server.py -l 9001
 
 # Specify both listening and model ports
-./.venv/bin/python agent_server.py -l 9001 -m 8500
+./.venv/bin/python agent/agent_server.py -l 9001 -m 8500
 ```
 
 #### 2. Check Agent Health
@@ -287,7 +287,7 @@ curl -X POST http://127.0.0.1:8001/agent/chat \
 
 ---
 
-### Option 2: LangChain Python Agent (`langchain_agent.py`)
+### Option 2: LangChain Python Agent (`agent/langchain_agent.py`)
 
 A Python-native agent using `langchain_core` and `langchain_openai`. Ideal for integrating directly into larger Python backends, background workflows, or automation pipelines.
 
@@ -297,7 +297,7 @@ A Python-native agent using `langchain_core` and `langchain_openai`. Ideal for i
 
 #### 1. Run the Agent CLI Test
 ```bash
-./.venv/bin/python langchain_agent.py
+./.venv/bin/python agent/langchain_agent.py
 ```
 
 **Output:**
@@ -317,7 +317,7 @@ A Python-native agent using `langchain_core` and `langchain_openai`. Ideal for i
 
 #### 2. Import into Your Applications
 ```python
-from langchain_agent import run_agent
+from agent.langchain_agent import run_agent
 
 answer = run_agent("What time is it right now and what is 250 * 4?")
 print(answer)
@@ -327,7 +327,7 @@ print(answer)
 
 ## 📊 Agent Options Comparison
 
-| Feature | Direct Mode (`:8000`) | Option 1: `agent_server.py` (`:8001`) | Option 2: `langchain_agent.py` |
+| Feature | Direct Mode (`:8000`) | Option 1: `agent/agent_server.py` (`:8001`) | Option 2: `agent/langchain_agent.py` |
 |---|---|---|---|
 | **Role** | Raw LLM Inference Engine | Front-end Agent Microservice | Python Agent Pipeline |
 | **Tools / Skills** | None (Raw Completion) | `calculate`, `lookup_system_status` | `get_current_time`, `calculate` |
@@ -339,7 +339,7 @@ print(answer)
 
 ## 🛑 Step 4: Shut Down
 
-### 1. Stopping the Agent Server (`agent_server.py`)
+### 1. Stopping the Agent Server (`agent/agent_server.py`)
 - If running in foreground: Press `Ctrl + C`
 - If running in background:
   ```bash
@@ -359,7 +359,7 @@ print(answer)
 ## 🛠 Technical Notes & Troubleshooting
 
 - **Llama 3.2 Single-Tool-Call Template Rule**:
-  Meta's official chat template for `Llama-3.2-3B-Instruct` enforces that each assistant turn contains at most one tool call (`"This model only supports single tool-calls at once!"`). Both `agent_server.py` and `langchain_agent.py` are structured to execute tool calls sequentially to ensure strict compatibility.
+  Meta's official chat template for `Llama-3.2-3B-Instruct` enforces that each assistant turn contains at most one tool call (`"This model only supports single tool-calls at once!"`). Both `agent/agent_server.py` and `agent/langchain_agent.py` are structured to execute tool calls sequentially to ensure strict compatibility.
 - **Offline / Air-Gapped Operation**:
   The flags `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` ensure no connection attempts are made to the public internet.
 - **Privacy & Prompt Logging**:

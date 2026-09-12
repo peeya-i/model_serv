@@ -55,48 +55,153 @@ This repository supports two interaction models:
 
 ---
 
-## 🛠️ Step 0: Setting up the Plaatform
-1. Go to huggingface.co to find the model you would like to use. Some models requires you to make a request access it. The example here is for meta-llama/Meta-Llama-3.2-3B-Instruct.
-    - After the model access is granted, go back to huggingface.co again and 
-2. Create a token by following the steps below:
-    - Click on the user icon (top-right) -> Access Tokens
-    - Click on +Create new token (top-right)
-    - Copy the token. It will not be shown again.
+## 🛠️ Step 0: Setting up the Platform
 
-3. Go to the terminal in the IDE or regular shell terminal.
-    ```
-    mkdir ~/Documents/model_serv
-    cd ~/Documents/model_serv
-    ```
-4. Install Python virtual environment and activate it.
-    ```
-    sudo apt install python3-venv
-    python3 -m venv .venv
-    source .venv/bin/activate
-    ```
-5. Install important libraries
-    ```
-    pip install -U transformers torch==2.13.0 "huggingface_hub[cli]" accelerate
-    ```
-6. Check Nvidia processor
-    ```
-    nvidia-smi
-    ```
-7. Authenticate with Hugging Face using `.env` or CLI
-    Create a `.env` file in the project root:
-    ```bash
-    echo "HF_TOKEN=hf_your_actual_token_here" > .env
-    ```
-    *`serve_private_llm.py` will automatically read `HF_TOKEN` from `.env` to authenticate all model downloads and API checks.*
+### 🔑 1. Hugging Face Prerequisites (All Operating Systems)
+1. **Request Model Access**: Visit [huggingface.co/meta-llama/Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) and accept the community license terms. Access is typically granted within minutes.
+2. **Generate Access Token**:
+   - In Hugging Face, click your profile icon (top-right) -> **Access Tokens**.
+   - Click **+ Create new token** (type: Read).
+   - Copy the token; you will need it in the configuration step below.
 
-8. Make the folder to store models:
-    ```bash
-    mkdir models
-    ```
-    *(Optional: You can pre-download a model manually, or let `serve_private_llm.py` download models automatically when you specify them!)*
-    ```bash
-    hf download meta-llama/Llama-3.2-3B-Instruct --local-dir ./models/Llama-3.2-3B-Instruct
-    ```
+---
+
+### 💻 2. System-Specific Installation & Setup
+
+Choose your operating system below to set up your directory, Python environment, dependencies, and GPU drivers:
+
+#### 🐧 Option A: Linux (Ubuntu / Debian)
+
+1. **Terminal & Project Directory**:
+   ```bash
+   mkdir -p ~/Documents/model_serv
+   cd ~/Documents/model_serv
+   ```
+
+2. **Python Virtual Environment**:
+   ```bash
+   sudo apt update && sudo apt install -y python3-venv python3-pip
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Install Dependencies**:
+   ```bash
+   pip install --upgrade pip
+   pip install -U transformers torch==2.13.0 "huggingface_hub[cli]" accelerate
+   ```
+
+4. **Install & Verify NVIDIA GPU Drivers**:
+   ```bash
+   # If nvidia-smi is not yet installed:
+   sudo apt install -y nvidia-utils-550  # or: sudo ubuntu-drivers install
+
+   # Verify GPU name, VRAM, and driver version:
+   nvidia-smi
+
+   # Query specific properties in clean tabular format:
+   nvidia-smi --query-gpu=name,memory.total,memory.free,driver_version,compute_cap --format=csv
+   ```
+
+---
+
+#### 🪟 Option B: Windows PC (Native & WSL2)
+
+1. **PowerShell & Project Directory**:
+   ```powershell
+   mkdir $HOME\Documents\model_serv
+   cd $HOME\Documents\model_serv
+   ```
+
+2. **Python Virtual Environment**:
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+   # Note: If script execution is restricted on Windows, run once:
+   # Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+   *(Or in Command Prompt: `.venv\Scripts\activate.bat`)*
+
+3. **Install Dependencies**:
+   ```powershell
+   python -m pip install --upgrade pip
+   pip install -U transformers torch==2.13.0 "huggingface_hub[cli]" accelerate
+   ```
+
+4. **Install & Verify NVIDIA GPU Drivers**:
+   - **Native Windows**:
+     1. Download and install the latest NVIDIA Driver from [nvidia.com/drivers](https://www.nvidia.com/download/index.aspx) (or via GeForce Experience / NVIDIA App).
+     2. The installer automatically provides `nvidia-smi.exe` and registers it in `C:\Windows\System32\`.
+     3. Verify in PowerShell or Command Prompt:
+        ```powershell
+        nvidia-smi
+        nvidia-smi --query-gpu=name,memory.total,memory.free,driver_version,compute_cap --format=csv
+        ```
+     *(GUI Alternative: Press `Ctrl + Shift + Esc` -> select **Performance** -> **GPU**, or run `dxdiag`)*
+   - **WSL2 (Windows Subsystem for Linux)**:
+     Install the NVIDIA Windows driver on the host machine. WSL2 automatically inherits GPU acceleration and CUDA support; run `nvidia-smi` directly in your WSL2 terminal.
+
+---
+
+#### 🍏 Option C: macOS (MacBook — Apple Silicon M-Series & Intel)
+
+1. **Terminal & Project Directory**:
+   ```bash
+   mkdir -p ~/Documents/model_serv
+   cd ~/Documents/model_serv
+   ```
+
+2. **Python Virtual Environment**:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Install Dependencies**:
+   ```bash
+   pip install --upgrade pip
+   pip install -U transformers torch "huggingface_hub[cli]" accelerate
+   ```
+
+4. **Inspect Chip, GPU Cores & Unified Memory**:
+   > **Note on Apple Silicon**: MacBooks with M1, M2, M3, or M4 chips utilize an SoC architecture with high-bandwidth Unified Memory shared across CPU and GPU cores rather than a discrete NVIDIA GPU.
+
+   ```bash
+   # View chip model, CPU/GPU core count, and Unified Memory:
+   system_profiler SPHardwareDataType SPDisplaysDataType | grep -E "Chip|Memory|Cores"
+
+   # Real-time GPU power and frequency usage (built-in):
+   sudo powermetrics --samplers gpu_power -i 1000 -n 1
+
+   # Optional terminal GPU monitor (similar to nvidia-smi / htop):
+   pip install asitop && asitop
+
+   # Verify PyTorch Apple Metal (MPS) GPU acceleration:
+   python3 -c "import torch; print('Apple GPU (MPS) Available:', torch.backends.mps.is_available())"
+   ```
+   *(GUI Alternative: Click Apple Menu `` -> **About This Mac** -> **System Report...** -> **Graphics/Displays**)*
+
+---
+
+### ⚙️ 3. Project Configuration & Model Storage (All Operating Systems)
+
+1. **Authenticate with Hugging Face (`.env`)**:
+   Create a `.env` file in the project root:
+   ```bash
+   echo "HF_TOKEN=hf_your_actual_token_here" > .env
+   ```
+   *(On Windows PowerShell: `Set-Content -Path .env -Value "HF_TOKEN=hf_your_actual_token_here"`)*
+   
+   *`serve_private_llm.py` automatically reads `HF_TOKEN` from `.env` to authenticate model downloads.*
+
+2. **Create Models Directory**:
+   ```bash
+   mkdir -p models
+   ```
+   *(Optional manual pre-download, or let `serve_private_llm.py` download automatically on first run)*:
+   ```bash
+   hf download meta-llama/Llama-3.2-3B-Instruct --local-dir ./models/Llama-3.2-3B-Instruct
+   ```
 
 
 ## 🚀 Step 1: Start the Local Model Server
@@ -342,17 +447,28 @@ print(answer)
 ### 1. Stopping the Agent Server (`agent/agent_server.py`)
 - If running in foreground: Press `Ctrl + C`
 - If running in background:
-  ```bash
-  kill $(lsof -t -i:8001)
-  ```
+  - **Linux / macOS**:
+    ```bash
+    kill $(lsof -t -i:8001)
+    ```
+  - **Windows (PowerShell)**:
+    ```powershell
+    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8001).OwningProcess -Force
+    ```
 
 ### 2. Stopping the Model Server (`serve_private_llm.py`)
 - If running in foreground: Press `Ctrl + C`
 - If running in background:
-  ```bash
-  pkill -f "serve_private_llm.py"
-  # Or: kill $(lsof -t -i:8000)
-  ```
+  - **Linux / macOS**:
+    ```bash
+    pkill -f "serve_private_llm.py"
+    # Or: kill $(lsof -t -i:8000)
+    ```
+  - **Windows (PowerShell)**:
+    ```powershell
+    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8000).OwningProcess -Force
+    ```
+
 
 ---
 

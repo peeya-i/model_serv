@@ -21,6 +21,11 @@ MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", f"http://127.0.0.1:{initial_mo
 client = OpenAI(base_url=MODEL_BASE_URL, api_key=MODEL_API_KEY)
 app = FastAPI(title="Local Agent Server")
 
+# Import event_logger from project root and attach logging middleware
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import event_logger
+app.middleware("http")(event_logger.create_logging_middleware("agent_server"))
+
 
 # 2. Define Agent Tools
 def calculate(expression: str) -> str:

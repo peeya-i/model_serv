@@ -9,6 +9,9 @@ os.environ["PYTHONWARNINGS"] = "ignore::UserWarning"
 
 # 1. Load environment variables from .env file if present
 project_dir = os.path.dirname(os.path.abspath(__file__))
+if project_dir not in sys.path:
+    sys.path.insert(0, project_dir)
+
 env_file = os.path.join(project_dir, ".env")
 if os.path.exists(env_file):
     try:
@@ -41,6 +44,7 @@ from vllm.utils.argparse_utils import FlexibleArgumentParser
 from vllm.entrypoints.openai.api_server import run_server
 from vllm.entrypoints.openai.cli_args import make_arg_parser, validate_parsed_serve_args
 from vllm.entrypoints.serve.utils.api_utils import cli_env_setup
+import event_logger
 
 
 def get_available_models(models_dir: str) -> list[tuple[str, str, int]]:
@@ -172,6 +176,7 @@ if __name__ == "__main__":
         "--host", "127.0.0.1",                       # Bind to localhost or specific internal IP
         "--port", listening_port,                    # Configured listening port (default: 8000)
         "--api-key", "your-internal-secure-gateway-token-xyz", # Secure token authentication
+        "--middleware", "event_logger.vllm_logging_middleware", # Complete request/response event logging
         "--no-enable-log-requests",                   # Privacy setting: Never write prompts to logs
         "--enforce-eager",                           # Avoid CUDA graph memory overhead if needed
         "--gpu-memory-utilization", "0.85",          # Cap GPU utilization safely

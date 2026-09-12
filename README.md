@@ -76,7 +76,7 @@ This repository supports two interaction models:
     ```
 5. Install important libraries
     ```
-    pip install -U transformers torch==2.13.0 "huggingface_hub[cli]"
+    pip install -U transformers torch==2.13.0 "huggingface_hub[cli]" accelerate
     ```
 6. Check Nvidia processor
     ```

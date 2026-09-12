@@ -9,10 +9,17 @@ os.environ["PYTHONWARNINGS"] = "ignore::UserWarning"
 
 # 1. Enforce air-gapped offline modes globally before importing frameworks
 os.environ["HF_HUB_OFFLINE"] = "1"
-os.environ["HF_DATASETS_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["VLLM_USE_FLASHINFER_SAMPLER"] = "0"
 
+# If HF_HUB_OFFLINE or TRANSFORMERS_OFFLINE are set here, the program will only use downloaded models
+# and will not be downloaded if it is missing
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+# Set the Hugging Face cache directory to a local path within the project
+project_dir = os.path.dirname(os.path.abspath(__file__))
+os.environ["HF_HOME"] = os.path.join(project_dir, "models")
+os.environ["HF_HUB_CACHE"] = os.path.join(project_dir, "models")
 
 import argparse
 import uvloop
@@ -50,6 +57,7 @@ if __name__ == "__main__":
     )
     cli_args, _ = cli_parser.parse_known_args()
     listening_port = str(cli_args.port)
+    served_model_name = os.path.basename(os.path.normpath(cli_args.model))
 
     # 2. Hardcode configuration args to prevent unauthorized command line overrides
     parser = FlexibleArgumentParser(
@@ -60,19 +68,23 @@ if __name__ == "__main__":
     # Define exact private runtime specifications
     custom_args = [
         "--model", cli_args.model,
-        "--served-model-name", "Llama-3.2-3B-Instruct", # Friendly model identifier for clients
+        "--served-model-name", served_model_name, # Friendly model identifier for clients
         "--host", "127.0.0.1",                       # Bind to localhost or specific internal IP
         "--port", listening_port,                    # Configured listening port (default: 8000)
         "--api-key", "your-internal-secure-gateway-token-xyz", # Secure token authentication
         "--no-enable-log-requests",                   # Privacy setting: Never write prompts to logs
         "--enforce-eager",                           # Avoid CUDA graph memory overhead if needed
         "--gpu-memory-utilization", "0.85",          # Cap GPU utilization safely
-        "--max-model-len", "4096",                   # Expanded context window for agent prompts and tool schemas
+        "--max-model-len", "2048",                   # Match TinyLlama's configured context window
         "--cpu-offload-gb", "3",                      # Offload ~3GB weights to system RAM to fit on 6GB GPU
-        # PI These flags enable tool calling with JSON for Agent-Workflow-Composer:
-        "--enable-auto-tool-choice",
-        "--tool-call-parser", "llama3_json",
     ]
+
+    # Only Llama 3.2 tokenizers provide the special tokens required by this parser.
+    if "llama-3.2" in served_model_name.lower():
+        custom_args.extend([
+            "--enable-auto-tool-choice",
+            "--tool-call-parser", "llama3_json",
+        ])
     
     args = parser.parse_args(custom_args)
     validate_parsed_serve_args(args)

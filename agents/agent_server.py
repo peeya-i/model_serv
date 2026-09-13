@@ -8,8 +8,8 @@ from openai import OpenAI
 import uvicorn
 
 # Default ports
-DEFAULT_LISTEN_PORT = 8001
-DEFAULT_MODEL_PORT = 8000
+DEFAULT_LISTEN_PORT = 8002
+DEFAULT_MODEL_PORT = 8001
 
 MODEL_API_KEY = os.environ.get("MODEL_API_KEY", "your-internal-secure-gateway-token-xyz")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Llama-3.2-3B-Instruct")
@@ -124,59 +124,86 @@ def run_agent(req: AgentQueryRequest):
     ]
     tools_executed = []
     active_model = get_active_model_name()
+    supports_tools = "llama-3.2" in active_model.lower()
 
-    # Step A: Query local model with tools
-    response = client.chat.completions.create(
-        model=active_model,
-        messages=messages,
-        tools=TOOL_SCHEMAS,
-        tool_choice="auto",
-        temperature=0.0,
-        max_tokens=512,
-    )
+    try:
+        # Step A: Query local model (with tools if supported by active model like Llama-3.2)
+        if supports_tools:
+            try:
+                response = client.chat.completions.create(
+                    model=active_model,
+                    messages=messages,
+                    tools=TOOL_SCHEMAS,
+                    tool_choice="auto",
+                    temperature=0.0,
+                    max_tokens=512,
+                )
+            except Exception as exc:
+                err_str = str(exc)
+                if "tool" in err_str.lower() and ("tool_choice" in err_str.lower() or "tool-call-parser" in err_str.lower() or "400" in err_str):
+                    response = client.chat.completions.create(
+                        model=active_model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=512,
+                    )
+                else:
+                    raise exc
+        else:
+            response = client.chat.completions.create(
+                model=active_model,
+                messages=messages,
+                temperature=0.2,
+                max_tokens=512,
+            )
 
-    response_message = response.choices[0].message
+        response_message = response.choices[0].message
 
-    # Step B: If the model decided to call a tool
-    if response_message.tool_calls:
-        for tool_call in response_message.tool_calls:
-            func_name = tool_call.function.name
-            args = json.loads(tool_call.function.arguments or "{}")
+        # Step B: If the model decided to call a tool
+        if hasattr(response_message, "tool_calls") and response_message.tool_calls:
+            for tool_call in response_message.tool_calls:
+                func_name = tool_call.function.name
+                args = json.loads(tool_call.function.arguments or "{}")
 
-            if func_name in AVAILABLE_TOOLS:
-                tools_executed.append(func_name)
-                tool_output = AVAILABLE_TOOLS[func_name](**args)
-            else:
-                tool_output = f"Error: Tool {func_name} not found"
+                if func_name in AVAILABLE_TOOLS:
+                    tools_executed.append(func_name)
+                    tool_output = AVAILABLE_TOOLS[func_name](**args)
+                else:
+                    tool_output = f"Error: Tool {func_name} not found"
 
-            # Llama-3.2 / Qwen template requires single tool_call per assistant message
-            messages.append({
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [tool_call],
-            })
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": str(tool_output),
-            })
+                # Llama-3.2 / Qwen template requires single tool_call per assistant message
+                messages.append({
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [tool_call],
+                })
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": str(tool_output),
+                })
 
-        # Step C: Generate final answer with tool observations
-        final_response = client.chat.completions.create(
-            model=active_model,
-            messages=messages,
-            temperature=0.2,
-            max_tokens=512,
-        )
+            # Step C: Generate final answer with tool observations
+            final_response = client.chat.completions.create(
+                model=active_model,
+                messages=messages,
+                temperature=0.2,
+                max_tokens=512,
+            )
+            return AgentQueryResponse(
+                reply=final_response.choices[0].message.content or "",
+                tools_used=tools_executed,
+            )
+
         return AgentQueryResponse(
-            reply=final_response.choices[0].message.content or "",
+            reply=response_message.content or "",
+            tools_used=[],
+        )
+    except Exception as e:
+        return AgentQueryResponse(
+            reply=f"Agent encountered error: {e}",
             tools_used=tools_executed,
         )
-
-    return AgentQueryResponse(
-        reply=response_message.content or "",
-        tools_used=[],
-    )
 
 
 if __name__ == "__main__":

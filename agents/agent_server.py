@@ -89,12 +89,25 @@ class AgentQueryResponse(BaseModel):
     tools_used: list[str]
 
 
+def get_active_model_name() -> str:
+    """Detects active model loaded in local model server, or falls back to MODEL_NAME."""
+    global MODEL_NAME
+    try:
+        models = client.models.list()
+        if models and models.data and len(models.data) > 0:
+            return models.data[0].id
+    except Exception:
+        pass
+    return MODEL_NAME
+
+
 @app.get("/health")
 def health_check():
+    active_model = get_active_model_name()
     return {
         "status": "healthy",
         "service": "local_agent_server",
-        "model": MODEL_NAME,
+        "model": active_model,
         "model_base_url": str(client.base_url),
     }
 
@@ -110,10 +123,11 @@ def run_agent(req: AgentQueryRequest):
         {"role": "user", "content": req.prompt},
     ]
     tools_executed = []
+    active_model = get_active_model_name()
 
     # Step A: Query local model with tools
     response = client.chat.completions.create(
-        model=MODEL_NAME,
+        model=active_model,
         messages=messages,
         tools=TOOL_SCHEMAS,
         tool_choice="auto",
@@ -135,7 +149,7 @@ def run_agent(req: AgentQueryRequest):
             else:
                 tool_output = f"Error: Tool {func_name} not found"
 
-            # Llama-3.2 template requires single tool_call per assistant message
+            # Llama-3.2 / Qwen template requires single tool_call per assistant message
             messages.append({
                 "role": "assistant",
                 "content": None,
@@ -149,7 +163,7 @@ def run_agent(req: AgentQueryRequest):
 
         # Step C: Generate final answer with tool observations
         final_response = client.chat.completions.create(
-            model=MODEL_NAME,
+            model=active_model,
             messages=messages,
             temperature=0.2,
             max_tokens=512,
@@ -182,14 +196,21 @@ if __name__ == "__main__":
         default=int(os.environ.get("MODEL_PORT", DEFAULT_MODEL_PORT)),
         help="Port where the local model server is running",
     )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("MODEL_NAME", None),
+        help="Model name or path to query (defaults to auto-detection from model server)",
+    )
     args = parser.parse_args()
 
     # Configure client to point to specified model server port
     target_model_url = f"http://127.0.0.1:{args.model_port}/v1"
     client = OpenAI(base_url=target_model_url, api_key=MODEL_API_KEY)
+    if args.model:
+        MODEL_NAME = args.model
 
     print(
         f"Starting Agent Server on http://127.0.0.1:{args.port} "
-        f"(Target model: {target_model_url})"
+        f"(Target model: {target_model_url}, Default Model: {MODEL_NAME})"
     )
     uvicorn.run(app, host="127.0.0.1", port=args.port)

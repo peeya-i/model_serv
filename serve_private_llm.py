@@ -39,12 +39,8 @@ os.environ["HF_HOME"] = os.path.join(project_dir, "models")
 os.environ["HF_HUB_CACHE"] = os.path.join(project_dir, "models")
 
 import argparse
-import uvloop
-from vllm.utils.argparse_utils import FlexibleArgumentParser
-from vllm.entrypoints.openai.api_server import run_server
-from vllm.entrypoints.openai.cli_args import make_arg_parser, validate_parsed_serve_args
-from vllm.entrypoints.serve.utils.api_utils import cli_env_setup
 import event_logger
+
 
 
 def get_available_models(models_dir: str) -> list[tuple[str, str, int]]:
@@ -79,14 +75,14 @@ def prompt_model_selection(models_dir: str) -> tuple[str, int]:
     """Prompt user to select an available model by number or enter custom parameters."""
     available = get_available_models(models_dir)
 
-    print("\n" + "=" * 56)
-    print(" Select a model to serve:")
-    print("=" * 56)
+    print("\n" + "=" * 56, flush=True)
+    print(" Select a model to serve:", flush=True)
+    print("=" * 56, flush=True)
     for idx, (display_name, _, max_len) in enumerate(available, 1):
-        print(f"  [{idx}] {display_name} (max-model-len: {max_len})")
+        print(f"  [{idx}] {display_name} (max-model-len: {max_len})", flush=True)
     custom_idx = len(available) + 1
-    print(f"  [{custom_idx}] Enter model name and max-len manually")
-    print("=" * 56)
+    print(f"  [{custom_idx}] Enter model name and max-len manually", flush=True)
+    print("=" * 56, flush=True)
 
     while True:
         try:
@@ -122,33 +118,69 @@ def prompt_model_selection(models_dir: str) -> tuple[str, int]:
 if __name__ == "__main__":
     # Fast exit for help request
     if "-h" in sys.argv or "--help" in sys.argv:
-        print("Usage: python serve_private_llm.py [-l <port>] [--model <model path or name>]")
+        print("Usage: python serve_private_llm.py [--cli] [-l <port>] [--model <model path or name>]")
         print("\nOptions:")
-        print("  -l, --port <port>   Listening port for the model server (default: 8000)")
+        print("  --cli               Run directly in terminal CLI mode (default port: 8001)")
+        print("  -l, --port <port>   Listening port (default: 8000 for Web App, 8001 for --cli)")
         print("  --model <model>     Model path or name (default: interactive selection)")
         sys.exit(0)
-
-    cli_env_setup()
-
-    models_dir = os.path.join(project_dir, "models")
-    has_model_arg = any(arg == "--model" or arg.startswith("--model=") for arg in sys.argv)
 
     cli_parser = argparse.ArgumentParser(add_help=False)
     cli_parser.add_argument(
         "-l", "--port",
         type=int,
-        default=int(os.environ.get("PORT", "8000")),
-        help="Listening port (default: 8000)"
+        default=None,
+        help="Listening port"
     )
     cli_parser.add_argument(
         "--model",
         default=None,
         help="Model path or name (default: current local model)"
     )
+    cli_parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="Run in terminal CLI mode directly"
+    )
     cli_args, _ = cli_parser.parse_known_args()
-    listening_port = str(cli_args.port)
 
-    # If --model is not provided via CLI, prompt the user interactively
+    is_cli = cli_args.cli or any(arg == "--cli" for arg in sys.argv)
+
+    # If started without the --cli flag, ask the user whether to start Web App or continue in terminal
+    if not is_cli:
+        print("\n" + "=" * 56, flush=True)
+        print(" Select an option:", flush=True)
+        print("=" * 56, flush=True)
+        print("  [1] Start the Web App", flush=True)
+        print("  [2] Continue Using the terminal", flush=True)
+        print("=" * 56, flush=True)
+        while True:
+            try:
+                choice = input("Select an option (1-2): ").strip()
+                if choice in ["1", "web", "Start the Web App"]:
+                    web_port = cli_args.port if cli_args.port is not None else int(os.environ.get("PORT", "8000"))
+                    from web_app import start_web_app
+                    start_web_app(port=web_port)
+                    sys.exit(0)
+                elif choice in ["2", "terminal", "Continue Using the terminal"]:
+                    break
+                else:
+                    print("Please select 1 or 2.", flush=True)
+            except (KeyboardInterrupt, EOFError):
+                print("\nOperation cancelled by user.", flush=True)
+                sys.exit(0)
+
+    models_dir = os.path.join(project_dir, "models")
+    has_model_arg = any(arg == "--model" or arg.startswith("--model=") for arg in sys.argv)
+
+    # When serving the model server via terminal/CLI, default to port 8001 unless overridden
+    default_port = 8001
+    if cli_args.port is not None:
+        listening_port = str(cli_args.port)
+    else:
+        listening_port = str(os.environ.get("PORT", str(default_port)))
+
+    # If --model is not provided via CLI, prompt the user interactively from models folder
     if has_model_arg and cli_args.model:
         selected_model = cli_args.model.strip().strip("'\"")
         if "tinyllama" in selected_model.lower():
@@ -161,18 +193,31 @@ if __name__ == "__main__":
         max_model_len = str(chosen_len)
 
     served_model_name = os.path.basename(os.path.normpath(selected_model))
+    served_model_names = [served_model_name]
+    if selected_model != served_model_name:
+        served_model_names.append(selected_model)
+
     print(f"\n[Info] Launching server for '{served_model_name}' on port {listening_port} (max-model-len: {max_model_len})...\n")
 
     # 2. Hardcode configuration args to prevent unauthorized command line overrides
+    from vllm.utils.argparse_utils import FlexibleArgumentParser
+    from vllm.entrypoints.openai.api_server import run_server
+    from vllm.entrypoints.openai.cli_args import make_arg_parser, validate_parsed_serve_args
+    from vllm.entrypoints.serve.utils.api_utils import cli_env_setup
+    import uvloop
+
+    cli_env_setup()
+
     parser = FlexibleArgumentParser(
         description="vLLM OpenAI-Compatible RESTful API server."
     )
     parser = make_arg_parser(parser)
 
+
     # Define exact private runtime specifications
     custom_args = [
         "--model", selected_model,
-        "--served-model-name", served_model_name, # Friendly model identifier for clients
+        "--served-model-name", *served_model_names, # Friendly model identifiers for clients
         "--host", "127.0.0.1",                       # Bind to localhost or specific internal IP
         "--port", listening_port,                    # Configured listening port (default: 8000)
         "--api-key", "your-internal-secure-gateway-token-xyz", # Secure token authentication

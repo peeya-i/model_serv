@@ -294,49 +294,257 @@ def get_gpu_info() -> dict[str, Any]:
     return info
 
 
-def get_available_models_list() -> list[dict[str, Any]]:
-    """Lists models stored locally in models/ or discovered in cache."""
-    models = []
+MODEL_METADATA_CATALOG = {
+    "Llama-3.2-3B-Instruct": {
+        "display_name": "Meta Llama 3.2 3B Instruct",
+        "parameters": "3.2B",
+        "vram_required_mb": 5120,
+        "vram_str": "~4.8 - 5.2 GB",
+        "quantization": "BF16 / FP16",
+        "tool_support": True,
+        "category": "agent_tools",
+        "applications": [
+            "Autonomous Agent Tool Calling (Native JSON Schemas)",
+            "Multi-Turn Context Reasoning & Instruction Following",
+            "Local Private RAG (Retrieval-Augmented Generation)",
+            "Conversational Assistant & Enterprise Chatbot"
+        ],
+        "default_len": 4096,
+    },
+    "meta-llama/Llama-3.2-3B-Instruct": {
+        "display_name": "Meta Llama 3.2 3B Instruct (Hugging Face)",
+        "parameters": "3.2B",
+        "vram_required_mb": 5120,
+        "vram_str": "~4.8 - 5.2 GB",
+        "quantization": "BF16 / FP16",
+        "tool_support": True,
+        "category": "agent_tools",
+        "applications": [
+            "Autonomous Agent Tool Calling (Native JSON Schemas)",
+            "Multi-Turn Context Reasoning & Instruction Following",
+            "Local Private RAG (Retrieval-Augmented Generation)",
+            "Conversational Assistant & Enterprise Chatbot"
+        ],
+        "default_len": 4096,
+    },
+    "TinyLlama/TinyLlama-1.1B-Chat-v1.0": {
+        "display_name": "TinyLlama 1.1B Chat",
+        "parameters": "1.1B",
+        "vram_required_mb": 2200,
+        "vram_str": "~2.0 - 2.5 GB",
+        "quantization": "BF16 / FP16",
+        "tool_support": False,
+        "category": "fast_prototyping",
+        "applications": [
+            "Ultra-Fast Edge Prototyping & Diagnostics",
+            "Resource-Constrained Environments (<4GB VRAM)",
+            "High-Speed Low-Latency Message Completions",
+            "API & Microservice Pipeline Health Verification"
+        ],
+        "default_len": 2048,
+    },
+    "Qwen/Qwen2.5-Coder-3B-Instruct": {
+        "display_name": "Qwen 2.5 Coder 3B Instruct",
+        "parameters": "3.1B",
+        "vram_required_mb": 5200,
+        "vram_str": "~5.0 - 5.5 GB",
+        "quantization": "BF16 / FP16",
+        "tool_support": True,
+        "category": "coding",
+        "applications": [
+            "Multi-Language Code Generation (Python, JS, C++, Rust, Go)",
+            "Syntax Debugging, Lint Repair, and Code Explanation",
+            "Bash Shell Automation and Command Line Scripting",
+            "Technical Tool Orchestration & API Client Generation"
+        ],
+        "default_len": 4096,
+    },
+    "google/gemma-2-2b-it": {
+        "display_name": "Google Gemma 2 2B Instruct",
+        "parameters": "2.6B",
+        "vram_required_mb": 3800,
+        "vram_str": "~3.6 - 4.0 GB",
+        "quantization": "BF16 / FP16",
+        "tool_support": False,
+        "category": "qa_summarization",
+        "applications": [
+            "Factual Question Answering & Knowledge Synthesis",
+            "Executive Article & Meeting Transcript Summarization",
+            "Customer Support & Safe Content Dialogue",
+            "Edge Computing Inference on Lower-Tier GPUs"
+        ],
+        "default_len": 4096,
+    },
+    "meta-llama/Meta-Llama-3-8B-Instruct": {
+        "display_name": "Meta Llama 3 8B Instruct",
+        "parameters": "8.0B",
+        "vram_required_mb": 8500,
+        "vram_str": "~8.5 - 16.0 GB",
+        "quantization": "FP16 / 4-bit AWQ",
+        "tool_support": True,
+        "category": "deep_reasoning",
+        "applications": [
+            "Deep Multi-Step Analytical Reasoning & Strategy",
+            "Complex Long-Form Creative & Technical Writing",
+            "High-Complexity Academic and Scientific Problem Solving",
+            "Advanced Logical Planning (Requires 3GB+ CPU Offload on 6GB GPUs)"
+        ],
+        "default_len": 4096,
+    },
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B": {
+        "display_name": "DeepSeek R1 Distill Qwen 1.5B",
+        "parameters": "1.5B",
+        "vram_required_mb": 2800,
+        "vram_str": "~2.6 - 3.0 GB",
+        "quantization": "BF16 / FP16",
+        "tool_support": False,
+        "category": "deep_reasoning",
+        "applications": [
+            "Chain-of-Thought (CoT) Mathematical Reasoning",
+            "Algorithmic & Logical Puzzle Step-by-Step Solving",
+            "Compact Coding & Mathematical Tutoring Assistants",
+            "Fast Efficient Reasoning on 4GB-6GB GPUs"
+        ],
+        "default_len": 4096,
+    },
+    "microsoft/Phi-3.5-mini-instruct": {
+        "display_name": "Microsoft Phi-3.5 Mini Instruct",
+        "parameters": "3.8B",
+        "vram_required_mb": 5800,
+        "vram_str": "~5.5 - 6.2 GB",
+        "quantization": "BF16 / FP16",
+        "tool_support": False,
+        "category": "qa_summarization",
+        "applications": [
+            "High-Quality Reasoning on Compact Mobile/Desktop GPUs",
+            "Multi-Turn Multilingual Question Answering",
+            "Structured Information Extraction & Document Auditing",
+            "Context-Rich Analytical Summarization"
+        ],
+        "default_len": 4096,
+    },
+}
+
+HF_SYSTEM_CACHE = os.path.expanduser("~/.cache/huggingface/hub")
+
+
+def get_available_models_list(gpu_vram_mb: Optional[int] = None) -> list[dict[str, Any]]:
+    """Scans local directories and cache, calculates hardware compatibility based on GPU VRAM,
+    and enriches with target applications and specifications."""
+    if gpu_vram_mb is None:
+        try:
+            gpu_info = get_gpu_info()
+            gpu_vram_mb = gpu_info.get("ram_total_mb", 6144)
+        except Exception:
+            gpu_vram_mb = 6144
+
+    active_model_name = running_processes.get("model", {}).get("model_name")
+    models_dict: dict[str, dict[str, Any]] = {}
+
+    # 1. Helper to record or update model entry
+    def record_model(model_id: str, path_str: str, source_type: str, is_downloaded: bool = True):
+        # Match against catalog metadata if available
+        meta = MODEL_METADATA_CATALOG.get(model_id) or MODEL_METADATA_CATALOG.get(os.path.basename(model_id)) or {}
+        display_name = meta.get("display_name") or model_id
+        parameters = meta.get("parameters") or ("1.1B" if "1.1b" in model_id.lower() else "8B" if "8b" in model_id.lower() else "3B")
+        vram_req = meta.get("vram_required_mb") or (2200 if "1.1b" in model_id.lower() else 8500 if "8b" in model_id.lower() else 5120)
+        vram_str = meta.get("vram_str") or (f"~{round(vram_req/1024, 1)} GB")
+        apps = meta.get("applications") or [
+            "General Text Completion & Dialogue",
+            "Instruction Following & Content Generation"
+        ]
+        category = meta.get("category") or "general"
+        tool_support = meta.get("tool_support", ("llama-3.2" in model_id.lower() or "qwen" in model_id.lower()))
+        default_len = meta.get("default_len") or (2048 if "tinyllama" in model_id.lower() else 4096)
+
+        # Calculate GPU compatibility
+        pct_gpu = round((vram_req / max(1, gpu_vram_mb)) * 100)
+        if vram_req <= gpu_vram_mb:
+            compat_status = "optimal"
+            compat_badge = f"🟢 100% GPU Compatible ({pct_gpu}% VRAM)"
+            compat_note = f"Fits comfortably inside {round(gpu_vram_mb/1024, 1)}GB GPU VRAM with dedicated KV cache"
+        elif vram_req <= gpu_vram_mb + 4096:
+            compat_status = "cpu_offload"
+            needed_offload = round((vram_req - gpu_vram_mb) / 1024, 1)
+            compat_badge = f"🟡 Runs with CPU Offload (~{needed_offload}GB RAM)"
+            compat_note = f"Exceeds dedicated VRAM by ~{needed_offload}GB; automatically offloads weight layers to system RAM"
+        else:
+            compat_status = "insufficient"
+            compat_badge = "🔴 Exceeds System Memory"
+            compat_note = f"Requires ~{vram_str} which exceeds available hardware capacity"
+
+        models_dict[model_id] = {
+            "name": model_id,
+            "display_name": display_name,
+            "path": path_str,
+            "parameters": parameters,
+            "vram_required_mb": vram_req,
+            "vram_str": vram_str,
+            "vram_percent_of_gpu": pct_gpu,
+            "compatibility_status": compat_status,
+            "compatibility_badge": compat_badge,
+            "compatibility_note": compat_note,
+            "applications": apps,
+            "category": category,
+            "tool_support": tool_support,
+            "max_model_len": default_len,
+            "type": source_type,
+            "is_downloaded": is_downloaded,
+            "is_active": (active_model_name == model_id or active_model_name == path_str),
+        }
+
+    # 2. Scan models/ directory
     if os.path.isdir(MODELS_DIR):
         for entry in sorted(os.listdir(MODELS_DIR)):
             full_path = os.path.join(MODELS_DIR, entry)
-            if os.path.isdir(full_path) and not entry.startswith(("models--", ".", "hub", "xet")):
+            if entry.startswith("models--"):
+                parts = entry.split("--")
+                if len(parts) >= 3:
+                    repo_id = f"{parts[1]}/{parts[2]}"
+                    record_model(repo_id, repo_id, "Local HuggingFace Cache", is_downloaded=True)
+            elif os.path.isdir(full_path) and not entry.startswith((".", "hub", "xet")):
                 cfg_path = os.path.join(full_path, "config.json")
                 if os.path.exists(cfg_path):
-                    max_len = 2048 if "tinyllama" in entry.lower() else 4096
-                    models.append({
-                        "name": entry,
-                        "path": f"models/{entry}",
-                        "max_model_len": max_len,
-                        "type": "Local Weights Directory",
-                    })
+                    record_model(entry, f"models/{entry}", "Local Weights Directory", is_downloaded=True)
 
-    # Hugging Face cache discovery
-    try:
-        from huggingface_hub import scan_cache_dir
-        cache_info = scan_cache_dir(MODELS_DIR)
-        for repo in cache_info.repos:
-            repo_id = repo.repo_id
-            if not any(m["name"] == repo_id or m["path"] == repo_id for m in models):
-                max_len = 2048 if "tinyllama" in repo_id.lower() else 4096
-                models.append({
-                    "name": repo_id,
-                    "path": repo_id,
-                    "max_model_len": max_len,
-                    "type": "Hugging Face Cache",
-                })
-    except Exception:
-        pass
+    # 3. Scan models/hub cache
+    hub_dir = os.path.join(MODELS_DIR, "hub")
+    if os.path.isdir(hub_dir):
+        for entry in sorted(os.listdir(hub_dir)):
+            if entry.startswith("models--"):
+                parts = entry.split("--")
+                if len(parts) >= 3:
+                    repo_id = f"{parts[1]}/{parts[2]}"
+                    if repo_id not in models_dict:
+                        record_model(repo_id, repo_id, "Local Hub Cache", is_downloaded=True)
 
-    if not models:
-        models.append({
-            "name": "Llama-3.2-3B-Instruct",
-            "path": "models/Llama-3.2-3B-Instruct",
-            "max_model_len": 4096,
-            "type": "Default Local Model",
-        })
+    # 4. Scan ~/.cache/huggingface/hub
+    if os.path.isdir(HF_SYSTEM_CACHE):
+        for entry in sorted(os.listdir(HF_SYSTEM_CACHE)):
+            if entry.startswith("models--"):
+                parts = entry.split("--")
+                if len(parts) >= 3:
+                    repo_id = f"{parts[1]}/{parts[2]}"
+                    if repo_id not in models_dict:
+                        record_model(repo_id, repo_id, "User HF Cache", is_downloaded=True)
 
-    return models
+    # 5. Include popular recommended models from catalog that can run on this system
+    for model_id in MODEL_METADATA_CATALOG:
+        if model_id not in models_dict and not any(m["name"].endswith(model_id) for m in models_dict.values()):
+            record_model(model_id, model_id, "Hugging Face Model Hub", is_downloaded=False)
+
+    # Return sorted list: Downloaded & Optimal models first, then other models
+    sorted_models = sorted(
+        models_dict.values(),
+        key=lambda m: (
+            not m["is_active"],
+            not m["is_downloaded"],
+            0 if m["compatibility_status"] == "optimal" else 1 if m["compatibility_status"] == "cpu_offload" else 2,
+            m["vram_required_mb"],
+        )
+    )
+
+    return sorted_models
 
 
 def get_available_agents_list() -> list[dict[str, Any]]:

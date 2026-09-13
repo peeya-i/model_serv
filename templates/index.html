@@ -703,6 +703,147 @@
       justify-content: flex-end;
       background: rgba(17, 24, 39, 0.4);
     }
+
+    /* Compatible Models Grid & Recommendation Cards */
+    .filter-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-subtle);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .filter-pill:hover, .filter-pill.active {
+      background: rgba(99, 102, 241, 0.25);
+      border-color: rgba(99, 102, 241, 0.6);
+      color: #fff;
+    }
+
+    .compat-models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+
+    .model-card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+    }
+    .model-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(99, 102, 241, 0.45);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+    .model-card.active-serving {
+      border-color: rgba(16, 185, 129, 0.6);
+      background: rgba(16, 185, 129, 0.05);
+      box-shadow: 0 0 18px rgba(16, 185, 129, 0.2);
+    }
+
+    .model-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 0.75rem;
+    }
+    .model-card-title {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .model-card-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-subtle);
+      margin-top: 3px;
+      word-break: break-all;
+    }
+
+    .model-vram-section {
+      background: rgba(0, 0, 0, 0.28);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin: 0.75rem 0;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .model-vram-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+
+    .model-apps-title {
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-subtle);
+      font-weight: 700;
+      margin-top: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
+    .model-apps-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 1rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .model-apps-list li {
+      font-size: 0.78rem;
+      color: #CBD5E1;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      line-height: 1.4;
+    }
+    .model-apps-list li::before {
+      content: "•";
+      color: var(--cyan);
+      font-weight: bold;
+    }
+
+    .btn-select-model {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      border-radius: 8px;
+      font-weight: 600;
+      background: rgba(99, 102, 241, 0.15);
+      color: #A5B4FC;
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn-select-model:hover {
+      background: rgba(99, 102, 241, 0.32);
+      color: #fff;
+      border-color: rgba(99, 102, 241, 0.6);
+    }
+    .btn-select-model.active-btn {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34D399;
+      border-color: rgba(16, 185, 129, 0.5);
+      cursor: default;
+    }
   </style>
 </head>
 <body>
@@ -782,59 +923,7 @@
         </div>
       </section>
 
-      <!-- 2. Models Selection Dropdown & Text Box -->
-      <section class="glass-card">
-        <div class="card-title-row">
-          <div>
-            <h2 class="card-title">🧠 Local Model Inference Engine</h2>
-            <p class="card-subtitle">Choose model from dropdown with option to enter or edit model name in text box</p>
-          </div>
-          <div id="model-status-indicator" class="status-badge inactive">
-            <span id="model-dot" class="dot inactive"></span>
-            <span id="model-status-text">Server Stopped</span>
-          </div>
-        </div>
-
-        <div class="config-line" style="flex-direction: column; align-items: stretch; gap: 1rem;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-            <!-- Dropdown choice -->
-            <div>
-              <label for="model-select" style="display:block; font-size: 0.75rem; color: var(--text-subtle); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
-                Model Selection (Dropdown)
-              </label>
-              <select id="model-select" class="text-input" style="width: 100%; font-family: 'JetBrains Mono', monospace;" onchange="onModelSelectChange()">
-                <option value="">Scanning models/ folder...</option>
-              </select>
-            </div>
-
-            <!-- Text box to view or enter model name -->
-            <div>
-              <label for="model-text-input" style="display:block; font-size: 0.75rem; color: var(--text-subtle); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
-                Model Name / Path (Text Box)
-              </label>
-              <input type="text" id="model-text-input" class="text-input" style="width: 100%; font-family: 'JetBrains Mono', monospace;" placeholder="e.g. models/Llama-3.2-3B-Instruct or Hugging Face repo" oninput="onModelTextInput()">
-            </div>
-          </div>
-
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding-top: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.05);">
-            <div id="model-spec-info" style="font-size: 0.8rem; color: var(--cyan);">
-              Ready to serve local LLM inference
-            </div>
-
-            <div class="line-actions" style="display: flex; align-items: center; gap: 1rem;">
-              <div class="port-box">
-                <span class="port-label">Port</span>
-                <input type="number" id="model-port-input" class="port-input" value="8001">
-              </div>
-              <button id="btn-model-toggle" class="btn btn-enable" onclick="toggleModelServer()">
-                <span>▶</span> Enable Model
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. GPU Model Number and Capabilities (Below Model Selection) -->
+      <!-- 2. GPU Model Number and Capabilities (Placed after Server-side Agent) -->
       <section class="glass-card" style="border-color: rgba(6, 182, 212, 0.2);">
         <div class="card-title-row">
           <div>
@@ -884,6 +973,64 @@
               <div id="vram-meter" class="progress-bar" style="width: 85%;"></div>
             </div>
             <div id="gpu-ram-sub" class="gpu-subvalue">3GB CPU offload enabled for models exceeding VRAM</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. System-Compatible AI Models & Integrated Local Model Inference Engine Card -->
+      <section class="glass-card" id="compatible-models-card" style="border-color: rgba(16, 185, 129, 0.25);">
+        <div class="card-title-row" style="flex-direction:column; align-items:stretch; gap:10px;">
+          <!-- Top Row: Title & Status Badge on Left, Filter Pills on Right -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <h2 class="card-title" style="margin:0;">🎯 Hardware-Compatible AI Models & Inference Engine</h2>
+              <div id="model-status-indicator" class="status-badge inactive">
+                <span id="model-dot" class="dot inactive"></span>
+                <span id="model-status-text">Server Stopped</span>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <button class="filter-pill active" onclick="filterCompatibleModels('all', this)">All Models</button>
+              <button class="filter-pill" onclick="filterCompatibleModels('optimal', this)">🟢 100% GPU Fit</button>
+              <button class="filter-pill" onclick="filterCompatibleModels('downloaded', this)">💾 On Disk</button>
+              <button class="filter-pill" onclick="filterCompatibleModels('agent_tools', this)">🤖 Tool Agents</button>
+              <button class="filter-pill" onclick="filterCompatibleModels('coding', this)">💻 Coding</button>
+            </div>
+          </div>
+
+          <!-- Bottom Row: Subtitle spans full 100% card width -->
+          <p class="card-subtitle" style="margin:0; width:100%;">
+            Analyzed dynamically against your detected GPU (<span id="comp-gpu-name" style="color:var(--cyan); font-weight:600;">Detecting...</span> with <span id="comp-gpu-vram" style="color:var(--emerald); font-weight:600;">-- MB VRAM</span>). Click <strong>"Select This Model"</strong> on any card below or type custom model target.
+          </p>
+        </div>
+
+        <!-- Integrated Model Controls: Model Name Input, Port to the right, Start Model button to the right -->
+        <div style="display:flex; align-items:flex-start; gap:1rem; flex-wrap:wrap; margin-top:1.25rem; margin-bottom:1.5rem; padding:1.1rem 1.25rem; background:rgba(0, 0, 0, 0.25); border:1px solid rgba(255, 255, 255, 0.07); border-radius:12px;">
+          <div style="flex:1; min-width:260px;">
+            <label for="model-text-input" style="display:block; font-size:0.75rem; color:var(--text-subtle); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+              Model Name
+            </label>
+            <input type="text" id="model-text-input" class="text-input" style="width:100%; font-family:'JetBrains Mono', monospace;" placeholder="e.g. models/Llama-3.2-3B-Instruct or Hugging Face repo ID" oninput="onModelTextInput()">
+            <div id="model-spec-info" style="font-size:0.8rem; color:var(--cyan); margin-top:6px;">
+              Ready to serve local LLM inference
+            </div>
+          </div>
+
+          <div class="line-actions" style="display:flex; align-items:center; gap:1rem; margin-top:1.45rem; flex-wrap:wrap;">
+            <div class="port-box">
+              <span class="port-label">Port</span>
+              <input type="number" id="model-port-input" class="port-input" value="8001">
+            </div>
+            <button id="btn-model-toggle" class="btn btn-enable" style="white-space:nowrap;" onclick="toggleModelServer()">
+              <span>▶</span> Start Model
+            </button>
+          </div>
+        </div>
+
+        <!-- Compatible Model Cards Grid -->
+        <div id="compatible-models-grid" class="compat-models-grid">
+          <div style="grid-column: 1 / -1; text-align:center; padding:2rem; color:var(--text-subtle);">
+            Scanning local models and evaluating GPU memory requirements...
           </div>
         </div>
       </section>
@@ -1071,32 +1218,24 @@
 
         updateAgentUI();
 
-        // 3. Update Models Dropdown & Text Box & Status
+        // 3. Update Models Text Box & Status
         availableModels = data.models || [];
-        const modelSelect = document.getElementById('model-select');
         const modelTextInput = document.getElementById('model-text-input');
         const modelServer = data.model_server || { status: 'stopped', running: false };
 
-        let modelOptionsHtml = availableModels.map(m => {
-          return `<option value="${m.path}">${m.name} (${m.type})</option>`;
-        }).join('');
-        modelOptionsHtml += `<option value="__custom__">✏️ Custom Model (Enter in text box)...</option>`;
-
-        if (modelSelect.dataset.initialized !== "true") {
-          modelSelect.innerHTML = modelOptionsHtml;
-          modelSelect.dataset.initialized = "true";
+        if (modelTextInput && !modelTextInput.dataset.initialized) {
+          modelTextInput.dataset.initialized = "true";
           if (modelServer.is_alive && modelServer.model_name) {
             modelTextInput.value = modelServer.model_name;
-            syncDropdownWithText(modelServer.model_name);
           } else if (availableModels.length > 0) {
-            modelSelect.selectedIndex = 0;
-            modelTextInput.value = availableModels[0].path;
+            modelTextInput.value = availableModels[0].path || availableModels[0].name;
           }
-          onModelSelectChange(false);
+          onModelTextInput();
         }
 
         updateModelUI();
         updateChatStatusUI();
+        renderCompatibleModels(availableModels, data.gpu);
 
         // Dynamically adjust polling frequency: poll rapidly (1.5s) when loading, relax (6s) when stable
         const modelLoading = data.model_server?.status === 'loading';
@@ -1254,7 +1393,7 @@
         modelDot.className = 'dot error';
         modelStatusText.textContent = `Process Terminated (Exit: ${modelServer.exit_code})`;
         modelToggleBtn.className = 'btn btn-enable';
-        modelToggleBtn.innerHTML = '<span>🔄</span> Enable Model';
+        modelToggleBtn.innerHTML = '<span>🔄</span> Start Model';
         if (specInfo) {
           const errPreview = modelServer.last_error ? escapeHtml(modelServer.last_error.length > 200 ? modelServer.last_error.slice(0, 197) + '...' : modelServer.last_error) : 'Process exited unexpectedly. Check logs.';
           specInfo.innerHTML = `<span style="color:var(--rose); font-weight:600;">❌ Server stopped with error:</span> ${errPreview}`;
@@ -1269,7 +1408,7 @@
         modelDot.className = 'dot inactive';
         modelStatusText.textContent = 'Server Stopped';
         modelToggleBtn.className = 'btn btn-enable';
-        modelToggleBtn.innerHTML = '<span>▶</span> Enable Model';
+        modelToggleBtn.innerHTML = '<span>▶</span> Start Model';
         if (topModelPill) {
           topModelPill.className = 'status-badge inactive';
           topModelDot.className = 'dot inactive';
@@ -1326,44 +1465,23 @@
       }
     }
 
-    function onModelSelectChange(syncText = true) {
-      const modelSelect = document.getElementById('model-select');
-      const modelTextInput = document.getElementById('model-text-input');
-      const specInfo = document.getElementById('model-spec-info');
-
-      if (modelSelect.value === '__custom__') {
-        specInfo.textContent = "Custom user-defined model or remote Hugging Face repository";
-        if (syncText) {
-          modelTextInput.focus();
-        }
-      } else {
-        if (syncText) {
-          modelTextInput.value = modelSelect.value;
-        }
-        const found = availableModels.find(m => m.path === modelSelect.value);
-        if (found) {
-          specInfo.textContent = `Type: ${found.type} | Max Context: ${found.max_model_len} tokens | Path: ${found.path}`;
-        } else {
-          specInfo.textContent = `Model Target: ${modelSelect.value}`;
-        }
-      }
-    }
-
     function onModelTextInput() {
-      const text = document.getElementById('model-text-input').value.trim();
-      syncDropdownWithText(text);
-    }
-
-    function syncDropdownWithText(text) {
-      const modelSelect = document.getElementById('model-select');
+      const textInput = document.getElementById('model-text-input');
+      const text = textInput ? textInput.value.trim() : '';
       const specInfo = document.getElementById('model-spec-info');
-      const match = availableModels.find(m => m.path === text || m.name === text);
+      if (!specInfo) return;
+
+      if (!text) {
+        specInfo.textContent = 'Enter a model name/path or click "Select This Model" on any card below';
+        return;
+      }
+
+      const match = availableModels.find(m => m.path === text || m.name === text || (m.display_name && m.display_name.toLowerCase() === text.toLowerCase()));
       if (match) {
-        modelSelect.value = match.path;
-        specInfo.textContent = `Type: ${match.type} | Max Context: ${match.max_model_len} tokens | Path: ${match.path}`;
+        const downloadBadge = match.is_downloaded ? '💾 Ready on Disk' : '☁️ Remote Hugging Face';
+        specInfo.innerHTML = `Selected: <strong>${escapeHtml(match.display_name || match.name)}</strong> (${match.parameters}) | VRAM: <span style="color:var(--emerald);">${match.vram_str}</span> | ${downloadBadge} | Context: ${match.max_model_len} tokens`;
       } else {
-        modelSelect.value = '__custom__';
-        specInfo.textContent = `Custom Model Target: ${text || "Please enter model name"}`;
+        specInfo.innerHTML = `Custom Target: <code style="color:var(--cyan);">${escapeHtml(text)}</code> | Will be launched directly via vLLM runtime`;
       }
     }
 
@@ -1372,7 +1490,7 @@
       const status = modelServer.status || (modelServer.running ? 'ready' : 'stopped');
       const portInput = parseInt(document.getElementById('model-port-input').value) || 8001;
       const modelText = document.getElementById('model-text-input').value.trim();
-      const modelToUse = modelText || document.getElementById('model-select').value || "models/Llama-3.2-3B-Instruct";
+      const modelToUse = modelText || "models/Llama-3.2-3B-Instruct";
 
       if (status === 'ready' || status === 'loading') {
         const res = await fetch('/api/model/stop', {
@@ -1410,6 +1528,145 @@
         }
       }
       setTimeout(refreshStatus, 350);
+    }
+
+    let currentModelFilter = 'all';
+
+    function filterCompatibleModels(filterKey, btn) {
+      currentModelFilter = filterKey;
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      if (currentStatusData && currentStatusData.models) {
+        renderCompatibleModels(currentStatusData.models, currentStatusData.gpu);
+      }
+    }
+
+    function selectModelForInference(modelPath, modelName) {
+      const textInput = document.getElementById('model-text-input');
+      const targetVal = modelPath || modelName;
+      if (textInput) {
+        textInput.value = targetVal;
+        onModelTextInput();
+
+        // Smooth scroll to the model input box and flash highlight
+        textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        textInput.focus();
+        textInput.style.borderColor = 'var(--emerald)';
+        textInput.style.boxShadow = '0 0 14px rgba(16, 185, 129, 0.45)';
+        setTimeout(() => {
+          textInput.style.borderColor = '';
+          textInput.style.boxShadow = '';
+        }, 1600);
+      }
+    }
+
+    function renderCompatibleModels(models, gpu) {
+      const container = document.getElementById('compatible-models-grid');
+      if (!container) return;
+
+      const gpuNameElem = document.getElementById('comp-gpu-name');
+      const gpuVramElem = document.getElementById('comp-gpu-vram');
+      if (gpu) {
+        if (gpuNameElem) gpuNameElem.textContent = gpu.model || 'NVIDIA GPU';
+        if (gpuVramElem) {
+          const totalGb = (gpu.ram_total_mb / 1024).toFixed(1);
+          const freeGb = (gpu.ram_available_mb / 1024).toFixed(1);
+          gpuVramElem.textContent = `${totalGb} GB VRAM (~${freeGb} GB Free)`;
+        }
+      }
+
+      const activeModelName = currentStatusData?.model_server?.model_name;
+      const isModelServerRunning = currentStatusData?.model_server?.running || currentStatusData?.model_server?.status === 'ready';
+
+      let filtered = (models || []).filter(m => {
+        if (currentModelFilter === 'all') return true;
+        if (currentModelFilter === 'optimal') return m.compatibility_status === 'optimal';
+        if (currentModelFilter === 'downloaded') return m.is_downloaded === true;
+        if (currentModelFilter === 'agent_tools') return m.tool_support === true || m.category === 'agent_tools';
+        if (currentModelFilter === 'coding') return m.category === 'coding' || (m.display_name && m.display_name.toLowerCase().includes('coder'));
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding:2rem; color:var(--text-subtle);">No models matching this filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(m => {
+        const isActive = isModelServerRunning && (
+          activeModelName === m.name ||
+          activeModelName === m.path ||
+          (activeModelName && (activeModelName.endsWith(m.name) || m.name.endsWith(activeModelName)))
+        );
+        const vramPct = Math.min(100, Math.max(12, m.vram_percent_of_gpu || 50));
+        
+        let barColor = 'var(--emerald)';
+        if (m.compatibility_status === 'cpu_offload') barColor = 'var(--amber)';
+        if (m.compatibility_status === 'insufficient') barColor = 'var(--rose)';
+
+        let statusBadgeClass = 'badge-entity-model';
+        if (m.compatibility_status === 'optimal') statusBadgeClass = 'badge-entity-agent';
+        else if (m.compatibility_status === 'cpu_offload') statusBadgeClass = 'badge-entity-tool';
+        else statusBadgeClass = 'badge-entity-other';
+
+        const downloadBadge = m.is_downloaded
+          ? `<span class="badge-entity badge-entity-user" style="font-size:0.7rem;">💾 Ready on Disk</span>`
+          : `<span class="badge-entity badge-entity-other" style="font-size:0.7rem;">☁️ Hugging Face</span>`;
+
+        const toolBadge = m.tool_support
+          ? `<span class="badge-entity badge-entity-agent" style="font-size:0.7rem;" title="Supports native function calling & tool use with server agents">🛠️ Tool Calling</span>`
+          : '';
+
+        const appsHtml = (m.applications || []).map(app => `<li>${escapeHtml(app)}</li>`).join('');
+
+        const actionButton = isActive
+          ? `<button class="btn-select-model active-btn"><span>●</span> Actively Serving Now</button>`
+          : `<button class="btn-select-model" onclick="selectModelForInference('${escapeHtml(m.path)}', '${escapeHtml(m.name)}')"><span>⚡</span> Select This Model</button>`;
+
+        return `
+          <div class="model-card ${isActive ? 'active-serving' : ''}">
+            <div>
+              <div class="model-card-header">
+                <div>
+                  <div class="model-card-title">${escapeHtml(m.display_name || m.name)}</div>
+                  <div class="model-card-id">${escapeHtml(m.name)}</div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                  <span class="badge-entity badge-entity-model" style="font-size:0.75rem; font-weight:700;">${escapeHtml(m.parameters || '3B')}</span>
+                  ${downloadBadge}
+                </div>
+              </div>
+
+              <div class="model-vram-section">
+                <div class="model-vram-row">
+                  <span style="color:var(--text-subtle); display:flex; align-items:center; gap:4px;">
+                    <span>🌡️</span> VRAM Needed:
+                  </span>
+                  <span style="font-weight:700; color:var(--cyan); font-family:var(--font-mono); font-size:0.85rem;">${escapeHtml(m.vram_str || 'N/A')}</span>
+                </div>
+                <div class="progress-bar-wrap" style="height:6px; margin: 4px 0 6px 0;">
+                  <div class="progress-bar" style="width:${vramPct}%; background:${barColor};"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; flex-wrap:wrap; gap:4px;">
+                  <span class="badge-entity ${statusBadgeClass}" style="font-size:0.72rem; padding:2px 6px;">
+                    ${escapeHtml(m.compatibility_badge || 'Hardware compatible')}
+                  </span>
+                  ${toolBadge}
+                </div>
+              </div>
+
+              <div class="model-apps-title">💡 What this model is good for:</div>
+              <ul class="model-apps-list">
+                ${appsHtml}
+              </ul>
+            </div>
+
+            <div style="margin-top:0.75rem;">
+              ${actionButton}
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function syncTemperatureFromInput(val) {
@@ -1466,9 +1723,7 @@
       chatBox.scrollTop = chatBox.scrollHeight;
 
       try {
-        const modelText = document.getElementById('model-text-input')?.value?.trim();
-        const modelSelect = document.getElementById('model-select')?.value;
-        const modelToUse = modelText || (modelSelect !== '__custom__' ? modelSelect : '');
+        const modelToUse = document.getElementById('model-text-input')?.value?.trim() || '';
         const tempInput = document.getElementById('chat-temperature-input');
         const temperature = tempInput ? (parseFloat(tempInput.value) || 0.7) : 0.7;
 

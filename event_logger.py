@@ -19,8 +19,8 @@ if not os.path.exists(LOG_FILE):
         f.write("[]\n")
 
 
-# Maximum log file size: 200MB default, configurable via environment variable
-MAX_LOG_SIZE_BYTES = int(os.environ.get("MAX_LOG_SIZE_BYTES", 200 * 1024 * 1024))
+# Maximum log file size: 100MB default, configurable via environment variable
+MAX_LOG_SIZE_BYTES = int(os.environ.get("MAX_LOG_SIZE_BYTES", 100 * 1024 * 1024))
 
 
 def _serialize_events(events: list[Any]) -> str:
@@ -31,13 +31,55 @@ def _serialize_events(events: list[Any]) -> str:
 def log_event(event_data: dict[str, Any]) -> None:
     """Thread-safe and process-safe appender for events.json using file locking.
     
-    Guarantees the log file never exceeds MAX_LOG_SIZE_BYTES (200MB) by purging
-    the oldest log events from the beginning of the array.
+    Guarantees the log file never exceeds MAX_LOG_SIZE_BYTES (100MB) by purging
+    the oldest log events from the beginning of the array in FIFO order.
     """
     # Do not log health checks, pings, or internal status polls
     endpoint = str(event_data.get("endpoint", "")).lower()
     if endpoint in {"/health", "/ping", "/healthz", "/v1/models"} or endpoint.startswith(("/health", "/ping")):
         return
+
+    # Ensure from_entity and to_entity are populated
+    from_entity = event_data.get("from_entity") or event_data.get("from")
+    to_entity = event_data.get("to_entity") or event_data.get("to")
+    service = str(event_data.get("service", "")).lower()
+    event_type = str(event_data.get("type", "request")).lower()
+
+    if not from_entity or not to_entity:
+        if service == "llm":
+            if event_type == "request":
+                from_entity = from_entity or "User"
+                to_entity = to_entity or "Model"
+            else:
+                from_entity = from_entity or "Model"
+                to_entity = to_entity or "User"
+        elif "agent" in service:
+            if event_type == "request":
+                from_entity = from_entity or "User"
+                to_entity = to_entity or "Agent"
+            else:
+                from_entity = from_entity or "Agent"
+                to_entity = to_entity or "User"
+        elif service == "tool":
+            if event_type == "request":
+                from_entity = from_entity or "Agent"
+                to_entity = to_entity or "Tool"
+            else:
+                from_entity = from_entity or "Tool"
+                to_entity = to_entity or "Agent"
+        else:
+            if event_type == "request":
+                from_entity = from_entity or "Client"
+                to_entity = to_entity or (event_data.get("service") or "Server")
+            else:
+                from_entity = from_entity or (event_data.get("service") or "Server")
+                to_entity = to_entity or "Client"
+
+    event_data["from_entity"] = from_entity
+    event_data["to_entity"] = to_entity
+    # Provide 'from' and 'to' aliases for backwards/frontend convenience
+    event_data["from"] = from_entity
+    event_data["to"] = to_entity
 
     os.makedirs(LOG_DIR, exist_ok=True)
     with open(LOG_FILE, "a+", encoding="utf-8") as f:
@@ -58,11 +100,11 @@ def log_event(event_data: dict[str, Any]) -> None:
             
             events.append(event_data)
 
-            # Serialize and check size against limit
+            # Serialize and check size against limit (100MB)
             serialized = _serialize_events(events)
             serialized_bytes = serialized.encode("utf-8")
 
-            # Purge older events from the front if the file exceeds MAX_LOG_SIZE_BYTES
+            # Purge older events from the front if the file exceeds MAX_LOG_SIZE_BYTES (100MB)
             while events and len(serialized_bytes) > MAX_LOG_SIZE_BYTES:
                 excess = len(serialized_bytes) - MAX_LOG_SIZE_BYTES
                 avg_item_size = max(1, len(serialized_bytes) // len(events))
@@ -102,6 +144,25 @@ def create_logging_middleware(service_name: str) -> Callable:
 
         # Request ID tracking
         request_id = request.headers.get("x-request-id") or f"req-{uuid.uuid4().hex[:12]}"
+
+        # Determine caller (from_entity) and receiver (to_entity)
+        from_hdr = request.headers.get("x-from-entity") or request.headers.get("x-caller")
+        to_hdr = request.headers.get("x-to-entity")
+
+        if service_name == "llm":
+            ua = request.headers.get("user-agent", "").lower()
+            caller = from_hdr or ("Agent" if ("openai" in ua or "python" in ua) else "User")
+            req_from = caller
+            req_to = to_hdr or "Model"
+        elif "agent" in service_name:
+            req_from = from_hdr or "User"
+            req_to = to_hdr or "Agent"
+        elif service_name == "web_app":
+            req_from = from_hdr or "User"
+            req_to = to_hdr or "Web App"
+        else:
+            req_from = from_hdr or "Client"
+            req_to = to_hdr or service_name.capitalize()
         
         # Read and parse request payload
         req_body_bytes = await request.body()
@@ -122,6 +183,8 @@ def create_logging_middleware(service_name: str) -> Callable:
             "request_id": request_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "service": service_name,
+            "from_entity": req_from,
+            "to_entity": req_to,
             "type": "request",
             "method": request.method,
             "endpoint": request.url.path,
@@ -138,6 +201,8 @@ def create_logging_middleware(service_name: str) -> Callable:
                 "request_id": request_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "service": service_name,
+                "from_entity": req_to,
+                "to_entity": req_from,
                 "type": "response",
                 "status_code": 500,
                 "duration_ms": duration_ms,
@@ -164,6 +229,8 @@ def create_logging_middleware(service_name: str) -> Callable:
                         "request_id": request_id,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "service": service_name,
+                        "from_entity": req_to,
+                        "to_entity": req_from,
                         "type": "response",
                         "status_code": response.status_code,
                         "duration_ms": duration_ms,
@@ -193,6 +260,8 @@ def create_logging_middleware(service_name: str) -> Callable:
             "request_id": request_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "service": service_name,
+            "from_entity": req_to,
+            "to_entity": req_from,
             "type": "response",
             "status_code": response.status_code,
             "duration_ms": duration_ms,
@@ -207,3 +276,4 @@ def create_logging_middleware(service_name: str) -> Callable:
 
 # Default pre-configured middleware instance for vLLM
 vllm_logging_middleware = create_logging_middleware("llm")
+

@@ -18,7 +18,11 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "Llama-3.2-3B-Instruct")
 initial_model_port = int(os.environ.get("MODEL_PORT", DEFAULT_MODEL_PORT))
 MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", f"http://127.0.0.1:{initial_model_port}/v1")
 
-client = OpenAI(base_url=MODEL_BASE_URL, api_key=MODEL_API_KEY)
+client = OpenAI(
+    base_url=MODEL_BASE_URL,
+    api_key=MODEL_API_KEY,
+    default_headers={"x-from-entity": "Agent", "x-to-entity": "Model"},
+)
 app = FastAPI(title="Local Agent Server")
 
 # Import event_logger from project root and attach logging middleware
@@ -82,6 +86,7 @@ TOOL_SCHEMAS = [
 class AgentQueryRequest(BaseModel):
     prompt: str
     session_id: str | None = "default"
+    temperature: float | None = None
 
 
 class AgentQueryResponse(BaseModel):
@@ -125,6 +130,8 @@ def run_agent(req: AgentQueryRequest):
     tools_executed = []
     active_model = get_active_model_name()
     supports_tools = "llama-3.2" in active_model.lower()
+    tool_temp = 0.0 if req.temperature is None else req.temperature
+    gen_temp = 0.7 if req.temperature is None else req.temperature
 
     try:
         # Step A: Query local model (with tools if supported by active model like Llama-3.2)
@@ -135,7 +142,7 @@ def run_agent(req: AgentQueryRequest):
                     messages=messages,
                     tools=TOOL_SCHEMAS,
                     tool_choice="auto",
-                    temperature=0.0,
+                    temperature=tool_temp,
                     max_tokens=512,
                 )
             except Exception as exc:
@@ -144,7 +151,7 @@ def run_agent(req: AgentQueryRequest):
                     response = client.chat.completions.create(
                         model=active_model,
                         messages=messages,
-                        temperature=0.2,
+                        temperature=gen_temp,
                         max_tokens=512,
                     )
                 else:
@@ -153,7 +160,7 @@ def run_agent(req: AgentQueryRequest):
             response = client.chat.completions.create(
                 model=active_model,
                 messages=messages,
-                temperature=0.2,
+                temperature=gen_temp,
                 max_tokens=512,
             )
 
@@ -167,7 +174,32 @@ def run_agent(req: AgentQueryRequest):
 
                 if func_name in AVAILABLE_TOOLS:
                     tools_executed.append(func_name)
+                    # Log tool invocation
+                    tool_req_id = f"tool-{uuid.uuid4().hex[:8]}"
+                    event_logger.log_event({
+                        "event_id": f"evt-{uuid.uuid4().hex[:12]}",
+                        "request_id": tool_req_id,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "service": "tool",
+                        "from_entity": "Agent",
+                        "to_entity": f"Tool:{func_name}",
+                        "type": "request",
+                        "endpoint": f"/tool/{func_name}",
+                        "payload": args,
+                    })
                     tool_output = AVAILABLE_TOOLS[func_name](**args)
+                    event_logger.log_event({
+                        "event_id": f"evt-{uuid.uuid4().hex[:12]}",
+                        "request_id": tool_req_id,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "service": "tool",
+                        "from_entity": f"Tool:{func_name}",
+                        "to_entity": "Agent",
+                        "type": "response",
+                        "status_code": 200,
+                        "endpoint": f"/tool/{func_name}",
+                        "payload": {"result": tool_output},
+                    })
                 else:
                     tool_output = f"Error: Tool {func_name} not found"
 

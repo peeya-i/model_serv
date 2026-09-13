@@ -52,6 +52,7 @@ TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 class AgentQueryRequest(BaseModel):
     prompt: str
     session_id: Optional[str] = "default"
+    temperature: Optional[float] = None
 
 
 class AgentQueryResponse(BaseModel):
@@ -82,15 +83,16 @@ def get_active_model_name() -> str:
     return runtime_config["model_name"]
 
 
-def get_llm_instance(model_name: str, with_tools: bool = True):
+def get_llm_instance(model_name: str, with_tools: bool = True, temperature: float = 0.0):
     """Creates a ChatOpenAI LangChain instance pointing to the target local model server."""
     base_url = f"http://127.0.0.1:{runtime_config['model_port']}/v1"
     llm = ChatOpenAI(
         base_url=base_url,
         api_key=MODEL_API_KEY,
         model=model_name,
-        temperature=0.0,
+        temperature=temperature,
         max_tokens=512,
+        default_headers={"x-from-entity": "Agent", "x-to-entity": "Model"},
     )
     if with_tools:
         return llm.bind_tools(TOOLS), llm
@@ -127,6 +129,8 @@ def chat_endpoint(req: AgentQueryRequest):
         "request_id": request_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "langchain_agent",
+        "from_entity": "User",
+        "to_entity": "Agent",
         "type": "request",
         "endpoint": "/agent/chat",
         "payload": {"query": query},
@@ -134,6 +138,8 @@ def chat_endpoint(req: AgentQueryRequest):
 
     active_model = get_active_model_name()
     supports_tools = "llama-3.2" in active_model.lower()
+    tool_temp = 0.0 if req.temperature is None else req.temperature
+    gen_temp = 0.7 if req.temperature is None else req.temperature
     messages = [
         SystemMessage(content="You are a helpful assistant with access to local tools. Always call tools when needed."),
         HumanMessage(content=query),
@@ -142,17 +148,18 @@ def chat_endpoint(req: AgentQueryRequest):
     try:
         # Step A: Query model (with tools if supported by active model like Llama-3.2)
         if supports_tools:
-            llm_bound, llm_plain = get_llm_instance(active_model, with_tools=True)
+            llm_bound, llm_plain = get_llm_instance(active_model, with_tools=True, temperature=tool_temp)
             try:
                 ai_msg = llm_bound.invoke(messages)
             except Exception as exc:
                 err_str = str(exc)
                 if "tool" in err_str.lower() and ("tool_choice" in err_str.lower() or "tool-call-parser" in err_str.lower() or "400" in err_str):
-                    ai_msg = llm_plain.invoke(messages)
+                    _, fallback_llm = get_llm_instance(active_model, with_tools=False, temperature=gen_temp)
+                    ai_msg = fallback_llm.invoke(messages)
                 else:
                     raise exc
         else:
-            _, llm_plain = get_llm_instance(active_model, with_tools=False)
+            _, llm_plain = get_llm_instance(active_model, with_tools=False, temperature=gen_temp)
             ai_msg = llm_plain.invoke(messages)
 
         # Step B: Execute tools if requested by the model
@@ -161,11 +168,38 @@ def chat_endpoint(req: AgentQueryRequest):
                 tool_name = tool_call.get("name")
                 tool_args = tool_call.get("args") or {}
 
+                # Log tool invocation
+                tool_req_id = f"tool-{uuid.uuid4().hex[:8]}"
+                event_logger.log_event({
+                    "event_id": f"evt-{uuid.uuid4().hex[:12]}",
+                    "request_id": tool_req_id,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "service": "tool",
+                    "from_entity": "Agent",
+                    "to_entity": f"Tool:{tool_name}",
+                    "type": "request",
+                    "endpoint": f"/tool/{tool_name}",
+                    "payload": tool_args,
+                })
+
                 if tool_name in TOOLS_BY_NAME:
                     tools_executed.append(tool_name)
                     tool_output = TOOLS_BY_NAME[tool_name].invoke(tool_args)
                 else:
                     tool_output = f"Error: Tool '{tool_name}' not found"
+
+                event_logger.log_event({
+                    "event_id": f"evt-{uuid.uuid4().hex[:12]}",
+                    "request_id": tool_req_id,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "service": "tool",
+                    "from_entity": f"Tool:{tool_name}",
+                    "to_entity": "Agent",
+                    "type": "response",
+                    "status_code": 200,
+                    "endpoint": f"/tool/{tool_name}",
+                    "payload": {"result": str(tool_output)},
+                })
 
                 messages.append(ai_msg)
                 messages.append(
@@ -188,6 +222,8 @@ def chat_endpoint(req: AgentQueryRequest):
             "request_id": request_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "service": "langchain_agent",
+            "from_entity": "Agent",
+            "to_entity": "User",
             "type": "response",
             "status_code": 200,
             "duration_ms": duration_ms,
@@ -207,6 +243,8 @@ def chat_endpoint(req: AgentQueryRequest):
             "request_id": request_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "service": "langchain_agent",
+            "from_entity": "Agent",
+            "to_entity": "User",
             "type": "response",
             "status_code": 500,
             "duration_ms": duration_ms,

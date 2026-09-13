@@ -442,6 +442,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
     }
     .chat-messages {
       flex: 1;
@@ -523,6 +525,22 @@
     .badge-llm { background: rgba(99, 102, 241, 0.2); color: #818CF8; }
     .badge-agent { background: rgba(16, 185, 129, 0.2); color: #34D399; }
     .badge-langchain { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+
+    .badge-entity {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .badge-entity-user { background: rgba(56, 189, 248, 0.18); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.35); }
+    .badge-entity-agent { background: rgba(16, 185, 129, 0.18); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.35); }
+    .badge-entity-model { background: rgba(139, 92, 246, 0.18); color: #A78BFA; border: 1px solid rgba(139, 92, 246, 0.35); }
+    .badge-entity-tool { background: rgba(245, 158, 11, 0.18); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.35); }
+    .badge-entity-other { background: rgba(148, 163, 184, 0.18); color: #CBD5E1; border: 1px solid rgba(148, 163, 184, 0.35); }
 
     .payload-cell {
       max-width: 360px;
@@ -883,12 +901,22 @@
               <span id="chat-target-status-text">Checking status...</span>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:0.8rem; color:var(--text-subtle);">Target:</span>
-            <select id="chat-target-select" class="text-input" style="padding:4px 10px; font-size:0.8rem; width:170px;" onchange="updateChatStatusUI()">
-              <option value="model">Direct Model (:8001)</option>
-              <option value="agent">Server Agent (:8002)</option>
-            </select>
+          <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:0.8rem; color:var(--text-subtle);">Target:</span>
+              <select id="chat-target-select" class="text-input" style="padding:4px 10px; font-size:0.8rem; width:170px;" onchange="updateChatStatusUI()">
+                <option value="model">Direct Model (:8001)</option>
+                <option value="agent">Server Agent (:8002)</option>
+              </select>
+            </div>
+            <!-- Pinned Temperature Configuration Control (will not scroll out) -->
+            <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:8px; border:1px solid var(--border);">
+              <span title="Controls sampling randomness: 0.0 is deterministic and focused; higher values (0.7 - 1.0+) are more creative." style="font-size:0.8rem; color:var(--text-subtle); cursor:help; display:flex; align-items:center; gap:4px;">
+                🌡️ Temp:
+              </span>
+              <input type="range" id="chat-temperature-slider" min="0.0" max="1.5" step="0.05" value="0.7" style="cursor:pointer; width:75px; accent-color:var(--cyan);" oninput="document.getElementById('chat-temperature-input').value = parseFloat(this.value).toFixed(2)">
+              <input type="number" id="chat-temperature-input" min="0.0" max="2.0" step="0.05" value="0.70" class="text-input" style="width:58px; padding:2px 6px; font-size:0.8rem; text-align:center; font-family:var(--font-mono); font-weight:600; color:var(--cyan);" onchange="syncTemperatureFromInput(this.value)">
+            </div>
           </div>
         </div>
 
@@ -911,7 +939,7 @@
         <div class="card-title-row">
           <div>
             <h2 class="card-title">📋 Structured Activity & Event Logs</h2>
-            <p class="card-subtitle">Real-time requests and responses stored in <code style="color:var(--cyan)">logs/events.json</code> (max 200MB FIFO capped)</p>
+            <p class="card-subtitle">Real-time requests and responses stored in <code style="color:var(--cyan)">logs/events.json</code> (max 100MB FIFO capped)</p>
           </div>
           <div style="display:flex; gap:8px;">
             <button class="btn btn-primary" style="padding:6px 12px; font-size:0.8rem;" onclick="loadLogs()">↻ Refresh Logs</button>
@@ -923,6 +951,8 @@
             <thead>
               <tr>
                 <th>Time</th>
+                <th>From</th>
+                <th>To</th>
                 <th>Service</th>
                 <th>Event</th>
                 <th>Endpoint / Route</th>
@@ -932,7 +962,7 @@
               </tr>
             </thead>
             <tbody id="logs-tbody">
-              <tr><td colspan="7" style="text-align:center; color:var(--text-subtle); padding:2rem;">Loading events from events.json...</td></tr>
+              <tr><td colspan="9" style="text-align:center; color:var(--text-subtle); padding:2rem;">Loading events from events.json...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1382,6 +1412,16 @@
       setTimeout(refreshStatus, 350);
     }
 
+    function syncTemperatureFromInput(val) {
+      let num = parseFloat(val);
+      if (isNaN(num)) num = 0.7;
+      num = Math.max(0.0, Math.min(2.0, num));
+      const slider = document.getElementById('chat-temperature-slider');
+      if (slider) slider.value = Math.min(1.5, num);
+      const input = document.getElementById('chat-temperature-input');
+      if (input) input.value = num.toFixed(2);
+    }
+
     async function sendChat() {
       const input = document.getElementById('chat-user-input');
       const text = input.value.trim();
@@ -1429,11 +1469,19 @@
         const modelText = document.getElementById('model-text-input')?.value?.trim();
         const modelSelect = document.getElementById('model-select')?.value;
         const modelToUse = modelText || (modelSelect !== '__custom__' ? modelSelect : '');
+        const tempInput = document.getElementById('chat-temperature-input');
+        const temperature = tempInput ? (parseFloat(tempInput.value) || 0.7) : 0.7;
 
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ prompt: text, target: target, port: targetPort, model: modelToUse })
+          body: JSON.stringify({
+            prompt: text,
+            target: target,
+            port: targetPort,
+            model: modelToUse,
+            temperature: temperature
+          })
         });
         const d = await res.json();
         let toolsInfo = '';
@@ -1445,6 +1493,50 @@
         loadingMsg.innerHTML = `<span style="color:var(--rose);">Error connecting to ${target} on port ${targetPort}: ${e.message}</span>`;
       }
       chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function getEntityBadge(entityName) {
+      const name = String(entityName || 'Unknown').trim();
+      const lower = name.toLowerCase();
+      let badgeClass = 'badge-entity-other';
+      let icon = '📦';
+      if (lower.includes('user') || lower.includes('client') || lower.includes('browser')) {
+        badgeClass = 'badge-entity-user';
+        icon = '👤';
+      } else if (lower.includes('agent')) {
+        badgeClass = 'badge-entity-agent';
+        icon = '🤖';
+      } else if (lower.includes('model') || lower.includes('llm') || lower.includes('vllm')) {
+        badgeClass = 'badge-entity-model';
+        icon = '🧠';
+      } else if (lower.includes('tool')) {
+        badgeClass = 'badge-entity-tool';
+        icon = '🛠️';
+      }
+      return `<span class="badge-entity ${badgeClass}">${icon} ${escapeHtml(name)}</span>`;
+    }
+
+    function resolveEntities(e) {
+      let fromEntity = e.from_entity || e.from;
+      let toEntity = e.to_entity || e.to;
+      if (!fromEntity || !toEntity) {
+        const srv = (e.service || '').toLowerCase();
+        const typ = (e.type || 'request').toLowerCase();
+        if (srv === 'llm') {
+          fromEntity = fromEntity || (typ === 'request' ? 'User' : 'Model');
+          toEntity = toEntity || (typ === 'request' ? 'Model' : 'User');
+        } else if (srv.includes('agent')) {
+          fromEntity = fromEntity || (typ === 'request' ? 'User' : 'Agent');
+          toEntity = toEntity || (typ === 'request' ? 'Agent' : 'User');
+        } else if (srv === 'tool') {
+          fromEntity = fromEntity || (typ === 'request' ? 'Agent' : 'Tool');
+          toEntity = toEntity || (typ === 'request' ? 'Tool' : 'Agent');
+        } else {
+          fromEntity = fromEntity || (typ === 'request' ? 'Client' : (e.service || 'Server'));
+          toEntity = toEntity || (typ === 'request' ? (e.service || 'Server') : 'Client');
+        }
+      }
+      return { fromEntity, toEntity };
     }
 
     let currentLogsData = [];
@@ -1463,7 +1555,7 @@
         }).reverse();
 
         if (currentLogsData.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-subtle); padding:2.5rem;">No activity events recorded yet. Send prompts or agent actions to generate logs.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-subtle); padding:2.5rem;">No activity events recorded yet. Send prompts or agent actions to generate logs.</td></tr>';
           return;
         }
 
@@ -1471,7 +1563,9 @@
           let srvBadge = 'badge-llm';
           if (e.service === 'agent_server') srvBadge = 'badge-agent';
           if (e.service === 'langchain_agent') srvBadge = 'badge-langchain';
+          if (e.service === 'tool') srvBadge = 'badge-entity-tool';
 
+          const { fromEntity, toEntity } = resolveEntities(e);
           const timeStr = (e.timestamp || '').includes('T') ? e.timestamp.split('T')[1].split('.')[0] : e.timestamp;
           const dur = e.duration_ms !== undefined ? `${e.duration_ms}ms` : '-';
           const stat = e.status_code ? `<span style="color:${e.status_code < 400 ? 'var(--emerald)' : 'var(--rose)'}; font-weight:600;">${e.status_code}</span>` : '-';
@@ -1509,6 +1603,8 @@
           tbody.innerHTML += `
             <tr class="log-row" onclick="openLogModal(${idx})" title="Click to view full payload and request details">
               <td style="color:var(--text-subtle);">${escapeHtml(timeStr)}</td>
+              <td>${getEntityBadge(fromEntity)}</td>
+              <td>${getEntityBadge(toEntity)}</td>
               <td><span class="badge-srv ${srvBadge}">${escapeHtml(e.service || 'unknown')}</span></td>
               <td><span style="font-weight:600; color:${methodColor}; font-size:0.75rem;">${escapeHtml((e.method || e.type || 'event').toUpperCase())}</span></td>
               <td><code style="color:var(--text-main); font-size:0.8rem;">${escapeHtml(e.endpoint || '-')}</code></td>
@@ -1530,12 +1626,16 @@
       let srvBadge = 'badge-llm';
       if (e.service === 'agent_server') srvBadge = 'badge-agent';
       if (e.service === 'langchain_agent') srvBadge = 'badge-langchain';
+      if (e.service === 'tool') srvBadge = 'badge-entity-tool';
 
+      const { fromEntity, toEntity } = resolveEntities(e);
       const dur = e.duration_ms !== undefined ? `${e.duration_ms}ms` : 'N/A';
       const stat = e.status_code ? e.status_code : 'N/A';
 
       const metaBar = document.getElementById('modal-meta-bar');
       metaBar.innerHTML = `
+        <div class="modal-meta-item">From: ${getEntityBadge(fromEntity)}</div>
+        <div class="modal-meta-item">To: ${getEntityBadge(toEntity)}</div>
         <div class="modal-meta-item">Service: <span class="badge-srv ${srvBadge}">${escapeHtml(e.service || 'unknown')}</span></div>
         <div class="modal-meta-item">Type: <strong>${escapeHtml(e.type || 'N/A')}</strong></div>
         <div class="modal-meta-item">Method: <strong>${escapeHtml(e.method || '-')}</strong></div>

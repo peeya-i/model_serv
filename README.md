@@ -33,7 +33,7 @@ This repository provides three primary ways to interact with your local models a
                  │                    Port 8001 (`/v1`)                          │
                  │         Model: Meta Llama-3.2-3B-Instruct                     │
                  │  - Air-gapped offline operation (Zero telemetry/external calls)│
-                 │  - Structured logging to logs/events.json (200MB FIFO capped) │
+                 │  - Structured logging to logs/events.json (100MB FIFO capped) │
                  │  - Hardware-optimized: 3GB CPU offload for 6GB VRAM GPUs      │
                  │  - Tool-calling parser enabled (llama3_json)                  │
                  └───────────────────────────────────────────────────────────────┘
@@ -54,7 +54,7 @@ This repository provides three primary ways to interact with your local models a
 | **Context Window** | `4096` tokens | Accommodates tool schemas, conversation history, and RAG chunks |
 | **Memory Allocation** | 0.85 GPU Util + 3GB RAM Offload | Tuned for ~6GB VRAM (Quadro RTX 3000 / RTX 2060 / GTX 1660) |
 | **Tool Calling Parser** | `llama3_json` | Enables structured function calling for agents |
-| **Event Logger** | `logs/events.json` | Complete payload logging with 200MB max FIFO rotation |
+| **Event Logger** | `logs/events.json` | Complete payload logging with 100MB max FIFO rotation |
 
 ---
 
@@ -486,7 +486,7 @@ print(answer)
 All requests and responses entering and leaving the LLM server, agent microservices, and Web App are automatically audited:
 - **Location**: `logs/events.json`
 - **Audit Coverage**: Full HTTP methods, paths, timestamps, execution durations, status codes, and complete request/response JSON payloads.
-- **Size Cap & Purging**: The log file is strictly capped at **200MB**. When a new event would cause the file to exceed 200MB, older events are purged in **FIFO** order using file-locked concurrency control.
+- **Size Cap & Purging**: The log file is strictly capped at **100MB**. When a new event would cause the file to exceed 100MB, older events are purged in **FIFO** order using file-locked concurrency control.
 - **Live Viewing**: Tab 3 of the Web App provides a real-time table of recent events with JSON previews.
 
 ---
@@ -553,4 +553,4 @@ All requests and responses entering and leaving the LLM server, agent microservi
 - **Offline / Air-Gapped Operation**:
   The flags `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` ensure no connection attempts are made to the public internet.
 - **Structured Audit Logging**:
-  All incoming queries and responses are recorded to `logs/events.json` with thread/process-safe file locking and an automatic 200MB max FIFO purge.
+  All incoming queries and responses are recorded to `logs/events.json` with thread/process-safe file locking and an automatic 100MB max FIFO purge.

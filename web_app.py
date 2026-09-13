@@ -398,6 +398,7 @@ class ChatQueryRequest(BaseModel):
     target: str = "agent"  # "agent" or "model"
     port: int = 8002
     model: Optional[str] = None
+    temperature: Optional[float] = 0.7
 
 
 # API Endpoints
@@ -735,7 +736,11 @@ def api_chat(req: ChatQueryRequest):
 
         agent_url = f"http://127.0.0.1:{req.port}/agent/chat"
         try:
-            resp = requests.post(agent_url, json={"prompt": req.prompt}, timeout=180)
+            agent_payload = {"prompt": req.prompt}
+            if req.temperature is not None:
+                agent_payload["temperature"] = req.temperature
+            agent_headers = {"x-from-entity": "User", "x-to-entity": "Agent"}
+            resp = requests.post(agent_url, json=agent_payload, headers=agent_headers, timeout=180)
             if resp.status_code == 200:
                 data = resp.json()
                 return {
@@ -771,7 +776,11 @@ def api_chat(req: ChatQueryRequest):
                 }
 
         model_url = f"http://127.0.0.1:{req.port}/v1/chat/completions"
-        headers = {"Authorization": "Bearer your-internal-secure-gateway-token-xyz"}
+        headers = {
+            "Authorization": "Bearer your-internal-secure-gateway-token-xyz",
+            "x-from-entity": "User",
+            "x-to-entity": "Model",
+        }
 
         # Discover active models dynamically from the model server to ensure exact model match
         actual_model_id = None
@@ -793,12 +802,13 @@ def api_chat(req: ChatQueryRequest):
             pass
 
         target_model = actual_model_id or health.get("active_model") or (os.path.basename(os.path.normpath(req.model)) if req.model else None) or "Llama-3.2-3B-Instruct"
+        temp = req.temperature if req.temperature is not None else 0.7
 
         payload = {
             "model": target_model,
             "messages": [{"role": "user", "content": req.prompt}],
             "max_tokens": 512,
-            "temperature": 0.2,
+            "temperature": temp,
         }
         try:
             resp = requests.post(model_url, json=payload, headers=headers, timeout=180)

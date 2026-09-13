@@ -39,6 +39,8 @@ os.environ["HF_HOME"] = os.path.join(project_dir, "models")
 os.environ["HF_HUB_CACHE"] = os.path.join(project_dir, "models")
 
 import argparse
+import platform
+import subprocess
 import event_logger
 
 
@@ -115,6 +117,182 @@ def prompt_model_selection(models_dir: str) -> tuple[str, int]:
             sys.exit(0)
 
 
+_existing_instances_checked = False
+
+
+def check_existing_instances(target_ports: list[int] = [8000, 8001, 8002]) -> list[dict]:
+    """Scans the system for other running instances of the application or processes using its default ports."""
+    current_pid = os.getpid()
+    parent_pid = os.getppid() if hasattr(os, "getppid") else None
+    detected = []
+    seen_pids = set()
+
+    app_keywords = ["serve_private_llm.py", "web_app.py", "vllm.entrypoints.openai", "vllm::enginecore", "enginecore"]
+
+    # 1. Process search via psutil if installed
+    try:
+        import psutil
+        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+            try:
+                pid = proc.info["pid"]
+                if pid in seen_pids or pid == current_pid or pid == parent_pid:
+                    continue
+                cmdline_list = proc.info.get("cmdline") or []
+                cmdline = " ".join(cmdline_list)
+                cmdline_lower = cmdline.lower()
+                proc_name = (proc.info.get("name") or "").lower()
+                if any(kw in cmdline_lower or kw in proc_name for kw in app_keywords):
+                    seen_pids.add(pid)
+                    detected.append({
+                        "pid": pid,
+                        "cmd": cmdline if cmdline else proc.info.get("name", "vllm"),
+                        "name": proc.info.get("name", "python")
+                    })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception:
+        # Fallback via OS commands
+        sys_type = platform.system()
+        if sys_type in ["Linux", "Darwin"]:
+            try:
+                out = subprocess.check_output(["ps", "-eo", "pid,args"], text=True, stderr=subprocess.DEVNULL)
+                for line in out.splitlines():
+                    parts = line.strip().split(None, 1)
+                    if len(parts) == 2 and parts[0].isdigit():
+                        pid = int(parts[0])
+                        cmd = parts[1]
+                        cmd_lower = cmd.lower()
+                        if pid not in seen_pids and pid != current_pid and pid != parent_pid:
+                            if any(kw in cmd_lower for kw in app_keywords):
+                                seen_pids.add(pid)
+                                detected.append({
+                                    "pid": pid,
+                                    "cmd": cmd,
+                                    "name": "python"
+                                })
+            except Exception:
+                pass
+        elif sys_type == "Windows":
+            try:
+                out = subprocess.check_output(
+                    ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine"],
+                    text=True,
+                    stderr=subprocess.DEVNULL
+                )
+                for line in out.splitlines():
+                    line_lower = line.lower()
+                    if any(kw in line_lower for kw in app_keywords):
+                        parts = line.strip().rsplit(None, 1)
+                        if len(parts) == 2 and parts[1].isdigit():
+                            pid = int(parts[1])
+                            if pid not in seen_pids and pid != current_pid and pid != parent_pid:
+                                seen_pids.add(pid)
+                                detected.append({
+                                    "pid": pid,
+                                    "cmd": parts[0],
+                                    "name": "python"
+                                })
+            except Exception:
+                pass
+
+    # 2. Check for port-bound processes (handles background workers or standalone instances)
+    if platform.system() in ["Linux", "Darwin"]:
+        for port in target_ports:
+            try:
+                out = subprocess.check_output(["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL).strip()
+                if out:
+                    for p in out.split():
+                        if p.isdigit():
+                            pid = int(p)
+                            if pid not in seen_pids and pid != current_pid and pid != parent_pid:
+                                seen_pids.add(pid)
+                                detected.append({
+                                    "pid": pid,
+                                    "cmd": f"Process listening on port {port}",
+                                    "port": port
+                                })
+            except Exception:
+                pass
+    elif platform.system() == "Windows":
+        for port in target_ports:
+            try:
+                out = subprocess.check_output(
+                    ["powershell", "-NoProfile", "-Command", f"(Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue).OwningProcess"],
+                    text=True,
+                    stderr=subprocess.DEVNULL
+                ).strip()
+                if out:
+                    for p in out.split():
+                        if p.isdigit():
+                            pid = int(p)
+                            if pid not in seen_pids and pid != current_pid and pid != parent_pid:
+                                seen_pids.add(pid)
+                                detected.append({
+                                    "pid": pid,
+                                    "cmd": f"Process listening on port {port}",
+                                    "port": port
+                                })
+            except Exception:
+                pass
+
+    return detected
+
+
+def check_and_notify_existing_instances(target_ports: list[int] = [8000, 8001, 8002]):
+    """Checks for other running instances of the app, notifies the user in the terminal with system-specific termination commands, and proceeds as normal."""
+    global _existing_instances_checked
+    if _existing_instances_checked:
+        return
+    _existing_instances_checked = True
+
+    instances = check_existing_instances(target_ports)
+    if not instances:
+        return
+
+    sys_type = platform.system()  # 'Linux', 'Darwin' (macOS), or 'Windows'
+    pids = [str(inst["pid"]) for inst in instances]
+    pids_space = " ".join(pids)
+    pids_comma = ",".join(pids)
+
+    ports_found = sorted({inst["port"] for inst in instances if inst.get("port")})
+
+    print("\n" + "=" * 76, flush=True)
+    print(" ⚠️  NOTICE: Another instance of this application is already running!", flush=True)
+    print("=" * 76, flush=True)
+    print(" Detected active instance(s):", flush=True)
+    for inst in instances:
+        port_info = f" [Port :{inst['port']}]" if inst.get("port") else ""
+        cmd_text = inst["cmd"]
+        if len(cmd_text) > 70:
+            cmd_text = cmd_text[:67] + "..."
+        print(f"   • PID {inst['pid']}{port_info} | {cmd_text}", flush=True)
+
+    print("\n Command(s) you can use to terminate the existing instance(s):", flush=True)
+    if sys_type == "Linux":
+        print(f"   ► Graceful terminate by PID:   kill -15 {pids_space}", flush=True)
+        print(f"   ► Force terminate by PID:      kill -9 {pids_space}", flush=True)
+        print("   ► Terminate all by script:     pkill -f serve_private_llm.py", flush=True)
+        for pt in ports_found:
+            print(f"   ► Free port {pt}:               fuser -k {pt}/tcp", flush=True)
+    elif sys_type == "Darwin":
+        print(f"   ► Graceful terminate by PID:   kill -15 {pids_space}", flush=True)
+        print(f"   ► Force terminate by PID:      kill -9 {pids_space}", flush=True)
+        print("   ► Terminate all by script:     pkill -f serve_private_llm.py", flush=True)
+        for pt in ports_found:
+            print(f"   ► Free port {pt}:               lsof -ti :{pt} | xargs kill -9", flush=True)
+    elif sys_type == "Windows":
+        print(f"   ► Command Prompt (CMD):        taskkill /F /PID {pids[0]}", flush=True)
+        print(f"   ► PowerShell:                  Stop-Process -Id {pids_comma} -Force", flush=True)
+        print("   ► Stop all Python instances:   taskkill /F /IM python.exe", flush=True)
+        for pt in ports_found:
+            print(f"   ► Free port {pt} (PowerShell):   Get-Process -Id (Get-NetTCPConnection -LocalPort {pt}).OwningProcess | Stop-Process -Force", flush=True)
+    else:
+        print(f"   ► Terminate by PID:            kill -9 {pids_space}", flush=True)
+
+    print("\n Proceeding as normal...", flush=True)
+    print("=" * 76 + "\n", flush=True)
+
+
 if __name__ == "__main__":
     # Fast exit for help request
     if "-h" in sys.argv or "--help" in sys.argv:
@@ -124,6 +302,9 @@ if __name__ == "__main__":
         print("  -l, --port <port>   Listening port (default: 8000 for Web App, 8001 for --cli)")
         print("  --model <model>     Model path or name (default: interactive selection)")
         sys.exit(0)
+
+    # Check and notify if another instance is already running
+    check_and_notify_existing_instances(target_ports=[8000, 8001, 8002])
 
     cli_parser = argparse.ArgumentParser(add_help=False)
     cli_parser.add_argument(
@@ -214,6 +395,12 @@ if __name__ == "__main__":
     parser = make_arg_parser(parser)
 
 
+    # Dynamic cpu-offload-gb based on model size:
+    # TinyLlama (1.1B) is only ~2.05 GB and fits entirely inside 6GB GPU VRAM with plenty of KV cache room.
+    # Forcing CPU offload on 1B models triggers UVAOffloader over PCIe, slowing token generation down to ~2 tokens/sec.
+    # For larger 3B models, offloading ~3GB prevents GPU memory exhaustion on 6GB cards.
+    needs_cpu_offload = "tinyllama" not in selected_model.lower()
+
     # Define exact private runtime specifications
     custom_args = [
         "--model", selected_model,
@@ -226,9 +413,10 @@ if __name__ == "__main__":
         "--enforce-eager",                           # Avoid CUDA graph memory overhead if needed
         "--gpu-memory-utilization", "0.85",          # Cap GPU utilization safely
         "--max-model-len", max_model_len,            # Set dynamically based on model loaded
-        "--cpu-offload-gb", "3",                      # Offload ~3GB weights to system RAM to fit on 6GB GPU
         "--attention-backend", "TRITON_ATTN",         # Explicitly use Triton attention for Turing (sm_75) GPUs
     ]
+    if needs_cpu_offload:
+        custom_args.extend(["--cpu-offload-gb", "3"])
 
     # Only Llama 3.2 tokenizers provide the special tokens required by this parser.
     if "llama-3.2" in served_model_name.lower():

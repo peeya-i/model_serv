@@ -34,6 +34,11 @@ def log_event(event_data: dict[str, Any]) -> None:
     Guarantees the log file never exceeds MAX_LOG_SIZE_BYTES (200MB) by purging
     the oldest log events from the beginning of the array.
     """
+    # Do not log health checks, pings, or internal status polls
+    endpoint = str(event_data.get("endpoint", "")).lower()
+    if endpoint in {"/health", "/ping", "/healthz", "/v1/models"} or endpoint.startswith(("/health", "/ping")):
+        return
+
     os.makedirs(LOG_DIR, exist_ok=True)
     with open(LOG_FILE, "a+", encoding="utf-8") as f:
         fcntl.flock(f.fileno(), fcntl.LOCK_EX)
@@ -87,8 +92,12 @@ def create_logging_middleware(service_name: str) -> Callable:
             return await call_next(request)
         setattr(request.state, f"_logged_by_{service_name}", True)
 
-        # Ignore static assets or docs to keep events.json clean
-        if request.url.path in {"/favicon.ico", "/docs", "/redoc", "/openapi.json"}:
+        # Ignore static assets, docs, health checks, and pings to keep events.json clean
+        path = request.url.path
+        if (
+            path in {"/favicon.ico", "/docs", "/redoc", "/openapi.json", "/health", "/ping", "/healthz", "/v1/models"}
+            or path.startswith(("/health", "/ping"))
+        ):
             return await call_next(request)
 
         # Request ID tracking

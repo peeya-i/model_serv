@@ -176,6 +176,8 @@ def run_agent(req: AgentQueryRequest):
                     tools_executed.append(func_name)
                     # Log tool invocation
                     tool_req_id = f"tool-{uuid.uuid4().hex[:8]}"
+                    tool_endpoint = f"/tool/{func_name}"
+                    tool_url = f"http://127.0.0.1:{DEFAULT_LISTEN_PORT}{tool_endpoint}"
                     event_logger.log_event({
                         "event_id": f"evt-{uuid.uuid4().hex[:12]}",
                         "request_id": tool_req_id,
@@ -184,10 +186,15 @@ def run_agent(req: AgentQueryRequest):
                         "from_entity": "Agent",
                         "to_entity": f"Tool:{func_name}",
                         "type": "request",
-                        "endpoint": f"/tool/{func_name}",
+                        "method": "INVOKE",
+                        "endpoint": tool_endpoint,
+                        "url": tool_url,
+                        "headers": {"content-type": "application/json", "x-tool-name": func_name},
                         "payload": args,
                     })
+                    t0_tool = time.time()
                     tool_output = AVAILABLE_TOOLS[func_name](**args)
+                    tool_dur_ms = round((time.time() - t0_tool) * 1000, 2)
                     event_logger.log_event({
                         "event_id": f"evt-{uuid.uuid4().hex[:12]}",
                         "request_id": tool_req_id,
@@ -196,8 +203,12 @@ def run_agent(req: AgentQueryRequest):
                         "from_entity": f"Tool:{func_name}",
                         "to_entity": "Agent",
                         "type": "response",
+                        "method": "INVOKE",
                         "status_code": 200,
-                        "endpoint": f"/tool/{func_name}",
+                        "duration_ms": tool_dur_ms,
+                        "endpoint": tool_endpoint,
+                        "url": tool_url,
+                        "headers": {"content-type": "application/json"},
                         "payload": {"result": tool_output},
                     })
                 else:

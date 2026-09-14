@@ -164,6 +164,15 @@ def create_logging_middleware(service_name: str) -> Callable:
             req_from = from_hdr or "Client"
             req_to = to_hdr or service_name.capitalize()
         
+        # Capture client information
+        client_host = request.client.host if request.client else None
+        client_port = request.client.port if request.client else None
+        client_addr = f"{client_host}:{client_port}" if client_host and client_port else client_host
+        http_proto = request.scope.get("http_version", "1.1")
+        req_headers = dict(request.headers)
+        req_query = dict(request.query_params)
+        req_url = str(request.url)
+
         # Read and parse request payload
         req_body_bytes = await request.body()
         req_payload: Any = None
@@ -177,7 +186,7 @@ def create_logging_middleware(service_name: str) -> Callable:
         else:
             req_payload = {}
 
-        # Log incoming request
+        # Log incoming request with all API call fields
         log_event({
             "event_id": f"evt-{uuid.uuid4().hex[:12]}",
             "request_id": request_id,
@@ -188,6 +197,12 @@ def create_logging_middleware(service_name: str) -> Callable:
             "type": "request",
             "method": request.method,
             "endpoint": request.url.path,
+            "url": req_url,
+            "http_version": http_proto,
+            "client": client_addr,
+            "client_ip": client_host,
+            "headers": req_headers,
+            "query_params": req_query,
             "payload": req_payload,
         })
 
@@ -204,10 +219,16 @@ def create_logging_middleware(service_name: str) -> Callable:
                 "from_entity": req_to,
                 "to_entity": req_from,
                 "type": "response",
+                "method": request.method,
                 "status_code": 500,
                 "duration_ms": duration_ms,
                 "endpoint": request.url.path,
-                "payload": {"error": str(exc)},
+                "url": req_url,
+                "http_version": http_proto,
+                "client": client_addr,
+                "client_ip": client_host,
+                "headers": {"content-type": "application/json"},
+                "payload": {"error": str(exc), "error_type": exc.__class__.__name__},
             })
             raise exc
 
@@ -232,9 +253,15 @@ def create_logging_middleware(service_name: str) -> Callable:
                         "from_entity": req_to,
                         "to_entity": req_from,
                         "type": "response",
+                        "method": request.method,
                         "status_code": response.status_code,
                         "duration_ms": duration_ms,
                         "endpoint": request.url.path,
+                        "url": req_url,
+                        "http_version": http_proto,
+                        "client": client_addr,
+                        "client_ip": client_host,
+                        "headers": dict(response.headers),
                         "payload": raw_text,
                     })
             response.body_iterator = streamed_iterator()
@@ -263,9 +290,15 @@ def create_logging_middleware(service_name: str) -> Callable:
             "from_entity": req_to,
             "to_entity": req_from,
             "type": "response",
+            "method": request.method,
             "status_code": response.status_code,
             "duration_ms": duration_ms,
             "endpoint": request.url.path,
+            "url": req_url,
+            "http_version": http_proto,
+            "client": client_addr,
+            "client_ip": client_host,
+            "headers": dict(response.headers),
             "payload": resp_payload,
         })
 

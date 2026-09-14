@@ -123,19 +123,6 @@ def chat_endpoint(req: AgentQueryRequest):
     start_time = time.perf_counter()
     tools_executed = []
 
-    # Log incoming request event
-    event_logger.log_event({
-        "event_id": f"evt-{uuid.uuid4().hex[:12]}",
-        "request_id": request_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "service": "langchain_agent",
-        "from_entity": "User",
-        "to_entity": "Agent",
-        "type": "request",
-        "endpoint": "/agent/chat",
-        "payload": {"query": query},
-    })
-
     active_model = get_active_model_name()
     supports_tools = "llama-3.2" in active_model.lower()
     tool_temp = 0.0 if req.temperature is None else req.temperature
@@ -170,6 +157,8 @@ def chat_endpoint(req: AgentQueryRequest):
 
                 # Log tool invocation
                 tool_req_id = f"tool-{uuid.uuid4().hex[:8]}"
+                tool_endpoint = f"/tool/{tool_name}"
+                tool_url = f"http://127.0.0.1:{DEFAULT_LISTEN_PORT}{tool_endpoint}"
                 event_logger.log_event({
                     "event_id": f"evt-{uuid.uuid4().hex[:12]}",
                     "request_id": tool_req_id,
@@ -178,15 +167,20 @@ def chat_endpoint(req: AgentQueryRequest):
                     "from_entity": "Agent",
                     "to_entity": f"Tool:{tool_name}",
                     "type": "request",
-                    "endpoint": f"/tool/{tool_name}",
+                    "method": "INVOKE",
+                    "endpoint": tool_endpoint,
+                    "url": tool_url,
+                    "headers": {"content-type": "application/json", "x-tool-name": tool_name},
                     "payload": tool_args,
                 })
 
+                t0_tool = time.time()
                 if tool_name in TOOLS_BY_NAME:
                     tools_executed.append(tool_name)
                     tool_output = TOOLS_BY_NAME[tool_name].invoke(tool_args)
                 else:
                     tool_output = f"Error: Tool '{tool_name}' not found"
+                tool_dur_ms = round((time.time() - t0_tool) * 1000, 2)
 
                 event_logger.log_event({
                     "event_id": f"evt-{uuid.uuid4().hex[:12]}",
@@ -196,8 +190,12 @@ def chat_endpoint(req: AgentQueryRequest):
                     "from_entity": f"Tool:{tool_name}",
                     "to_entity": "Agent",
                     "type": "response",
+                    "method": "INVOKE",
                     "status_code": 200,
-                    "endpoint": f"/tool/{tool_name}",
+                    "duration_ms": tool_dur_ms,
+                    "endpoint": tool_endpoint,
+                    "url": tool_url,
+                    "headers": {"content-type": "application/json"},
                     "payload": {"result": str(tool_output)},
                 })
 
@@ -215,24 +213,6 @@ def chat_endpoint(req: AgentQueryRequest):
             reply_text = final_response.content
         else:
             reply_text = ai_msg.content
-
-        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-        event_logger.log_event({
-            "event_id": f"evt-{uuid.uuid4().hex[:12]}",
-            "request_id": request_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "service": "langchain_agent",
-            "from_entity": "Agent",
-            "to_entity": "User",
-            "type": "response",
-            "status_code": 200,
-            "duration_ms": duration_ms,
-            "endpoint": "/agent/chat",
-            "payload": {
-                "reply": reply_text,
-                "tools_executed": tools_executed,
-            },
-        })
 
         return AgentQueryResponse(reply=reply_text, tools_used=tools_executed)
 

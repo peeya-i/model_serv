@@ -640,9 +640,9 @@
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(3, 7, 18, 0.78);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      background: rgba(3, 7, 18, 0.82);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -659,12 +659,12 @@
       background: #0B1120;
       border: 1px solid var(--border);
       border-radius: 16px;
-      width: 90%;
-      max-width: 820px;
-      max-height: 85vh;
+      width: 92%;
+      max-width: 960px;
+      max-height: 88vh;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 25px 65px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      box-shadow: 0 25px 65px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06);
       transform: translateY(16px) scale(0.98);
       transition: transform 0.2s ease;
       overflow: hidden;
@@ -686,7 +686,37 @@
       color: var(--text-main);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .modal-badges-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .modal-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .modal-pill-req {
+      background: rgba(99, 102, 241, 0.2);
+      color: #A5B4FC;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+    .modal-pill-resp {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .modal-pill-err {
+      background: rgba(244, 63, 94, 0.2);
+      color: #FDA4AF;
+      border: 1px solid rgba(244, 63, 94, 0.4);
     }
     .modal-close-btn {
       background: transparent;
@@ -703,28 +733,103 @@
       color: #fff;
       background: rgba(255, 255, 255, 0.1);
     }
-    .modal-meta-bar {
-      display: flex;
-      flex-wrap: wrap;
+
+    /* Modal Structured Fields Grid */
+    .modal-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 10px 16px;
-      padding: 12px 22px;
-      background: rgba(0, 0, 0, 0.3);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 14px 22px;
+      background: rgba(0, 0, 0, 0.35);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       font-size: 0.8rem;
     }
-    .modal-meta-item {
+    .modal-field-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .modal-field-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-subtle);
+    }
+    .modal-field-value {
+      font-size: 0.82rem;
+      color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 6px;
-      color: var(--text-subtle);
+      word-break: break-all;
     }
-    .modal-meta-item strong {
+    .modal-field-copyable {
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      transition: all 0.15s;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .modal-field-copyable:hover {
+      background: rgba(99, 102, 241, 0.25);
+      color: #C7D2FE;
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    /* Modal Tabs Navigation */
+    .modal-nav-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 8px 22px 0 22px;
+      background: rgba(17, 24, 39, 0.5);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .modal-tab-btn {
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .modal-tab-btn:hover {
       color: var(--text-main);
     }
+    .modal-tab-btn.active {
+      color: #A5B4FC;
+      border-bottom-color: var(--primary);
+    }
+    .modal-tab-count {
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-subtle);
+    }
+    .modal-tab-btn.active .modal-tab-count {
+      background: rgba(99, 102, 241, 0.25);
+      color: #A5B4FC;
+    }
+
+    /* Modal Body & Tab Panes */
     .modal-body {
       padding: 18px 22px;
       overflow-y: auto;
       flex: 1;
+    }
+    .modal-tab-pane {
+      display: none;
+    }
+    .modal-tab-pane.active {
+      display: block;
     }
     .modal-code-header {
       display: flex;
@@ -767,6 +872,46 @@
       white-space: pre-wrap;
       word-break: break-word;
       margin: 0;
+    }
+
+    /* Modal Headers & Key-Value Table */
+    .modal-kv-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      margin-bottom: 8px;
+    }
+    .modal-kv-table th, .modal-kv-table td {
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      text-align: left;
+    }
+    .modal-kv-table th {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-subtle);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+    }
+    .modal-kv-key {
+      color: #93C5FD;
+      white-space: nowrap;
+      font-weight: 600;
+      width: 25%;
+    }
+    .modal-kv-val {
+      color: #E2E8F0;
+      word-break: break-all;
+    }
+    .modal-empty-hint {
+      text-align: center;
+      padding: 2.5rem;
+      color: var(--text-subtle);
+      font-size: 0.85rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      border: 1px dashed rgba(255, 255, 255, 0.08);
     }
     .modal-footer {
       padding: 12px 22px;
@@ -1564,30 +1709,80 @@
       </section>
     </div>
 
-    <!-- Modal Popup for Event Payload Details -->
+    <!-- Modal Popup for Event Details & API Inspection -->
     <div id="log-modal" class="modal-overlay" onclick="if(event.target===this) closeLogModal()">
       <div class="modal-window">
         <div class="modal-header">
           <div class="modal-title">
-            <span>📋</span> Event Payload & Full Details
+            <span>📋</span> API Call & Event Inspector
+            <div id="modal-header-badges" class="modal-badges-group"></div>
           </div>
           <button class="modal-close-btn" onclick="closeLogModal()" title="Close (Esc)">✕</button>
         </div>
 
-        <div class="modal-meta-bar" id="modal-meta-bar">
-          <!-- Dynamically populated metadata -->
+        <div class="modal-meta-grid" id="modal-meta-grid">
+          <!-- Dynamically populated metadata grid with all fields -->
+        </div>
+
+        <div class="modal-nav-tabs">
+          <button class="modal-tab-btn active" id="modal-tab-btn-payload" onclick="switchModalTab('payload')">
+            📦 Payload / Body
+          </button>
+          <button class="modal-tab-btn" id="modal-tab-btn-headers" onclick="switchModalTab('headers')">
+            🏷️ HTTP Headers <span class="modal-tab-count" id="modal-headers-count">0</span>
+          </button>
+          <button class="modal-tab-btn" id="modal-tab-btn-params" onclick="switchModalTab('params')">
+            🔍 Query Params <span class="modal-tab-count" id="modal-params-count">0</span>
+          </button>
+          <button class="modal-tab-btn" id="modal-tab-btn-raw" onclick="switchModalTab('raw')">
+            📑 Complete Event JSON
+          </button>
         </div>
 
         <div class="modal-body">
-          <div class="modal-code-header">
-            <span>Complete Payload Content</span>
-            <button id="modal-copy-btn" class="modal-copy-btn" onclick="copyModalPayload()">📋 Copy JSON</button>
+          <!-- Tab 1: Payload / Body -->
+          <div class="modal-tab-pane active" id="modal-pane-payload">
+            <div class="modal-code-header">
+              <span id="modal-payload-title">Payload Content</span>
+              <button id="modal-copy-payload-btn" class="modal-copy-btn" onclick="copyModalPayload()">📋 Copy Payload JSON</button>
+            </div>
+            <pre class="modal-json-pre" id="modal-payload-content">{}</pre>
           </div>
-          <pre class="modal-json-pre" id="modal-payload-content">{}</pre>
+
+          <!-- Tab 2: HTTP Headers -->
+          <div class="modal-tab-pane" id="modal-pane-headers">
+            <div class="modal-code-header">
+              <span id="modal-headers-title">Captured HTTP Headers</span>
+              <button id="modal-copy-headers-btn" class="modal-copy-btn" onclick="copyModalHeaders()">📋 Copy Headers JSON</button>
+            </div>
+            <div id="modal-headers-container"></div>
+          </div>
+
+          <!-- Tab 3: Query & URL Params -->
+          <div class="modal-tab-pane" id="modal-pane-params">
+            <div class="modal-code-header">
+              <span>Query & URL Parameters</span>
+              <button id="modal-copy-params-btn" class="modal-copy-btn" onclick="copyModalParams()">📋 Copy Params JSON</button>
+            </div>
+            <div id="modal-params-container"></div>
+          </div>
+
+          <!-- Tab 4: Complete Event JSON (All Fields) -->
+          <div class="modal-tab-pane" id="modal-pane-raw">
+            <div class="modal-code-header">
+              <span>Complete Event Object (All Logged Fields)</span>
+              <button id="modal-copy-raw-btn" class="modal-copy-btn" onclick="copyModalRawEvent()">📋 Copy Full Event JSON</button>
+            </div>
+            <pre class="modal-json-pre" id="modal-raw-content">{}</pre>
+          </div>
         </div>
 
-        <div class="modal-footer">
-          <button class="btn btn-secondary" style="padding:6px 18px; font-size:0.85rem;" onclick="closeLogModal()">Close</button>
+        <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="copyModalRawEvent()">📋 Copy Full JSON</button>
+            <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="copyModalPayload()">📦 Copy Payload</button>
+          </div>
+          <button class="btn btn-primary" style="padding:6px 18px; font-size:0.85rem;" onclick="closeLogModal()">Close</button>
         </div>
       </div>
     </div>
@@ -2381,58 +2576,261 @@
       }
     }
 
+    let currentSelectedEvent = null;
+
+    function switchModalTab(tabName) {
+      ['payload', 'headers', 'params', 'raw'].forEach(t => {
+        const btn = document.getElementById(`modal-tab-btn-${t}`);
+        const pane = document.getElementById(`modal-pane-${t}`);
+        if (btn) btn.classList.toggle('active', t === tabName);
+        if (pane) pane.classList.toggle('active', t === tabName);
+      });
+    }
+
+    function copyTextToClipboard(text, btn) {
+      if (!text || text === 'N/A' || text === '-') return;
+      navigator.clipboard.writeText(text).then(() => {
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '✓ Copied!';
+          btn.style.color = 'var(--emerald)';
+          setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.style.color = '';
+          }, 2000);
+        }
+      });
+    }
+
+    function copyModalPayload() {
+      if (!currentSelectedEvent) return;
+      const text = JSON.stringify(currentSelectedEvent.payload !== undefined ? currentSelectedEvent.payload : {}, null, 2);
+      const btn = document.getElementById('modal-copy-payload-btn');
+      copyTextToClipboard(text, btn);
+    }
+
+    function copyModalHeaders() {
+      if (!currentSelectedEvent) return;
+      const text = JSON.stringify(currentSelectedEvent.headers || {}, null, 2);
+      const btn = document.getElementById('modal-copy-headers-btn');
+      copyTextToClipboard(text, btn);
+    }
+
+    function copyModalParams() {
+      if (!currentSelectedEvent) return;
+      const text = JSON.stringify(currentSelectedEvent.query_params || {}, null, 2);
+      const btn = document.getElementById('modal-copy-params-btn');
+      copyTextToClipboard(text, btn);
+    }
+
+    function copyModalRawEvent() {
+      if (!currentSelectedEvent) return;
+      const text = JSON.stringify(currentSelectedEvent, null, 2);
+      const btn = document.getElementById('modal-copy-raw-btn');
+      copyTextToClipboard(text, btn);
+    }
+
     function openLogModal(idx) {
       const e = currentLogsData[idx];
       if (!e) return;
+      currentSelectedEvent = e;
 
       let srvBadge = 'badge-llm';
       if (e.service === 'agent_server') srvBadge = 'badge-agent';
       if (e.service === 'langchain_agent') srvBadge = 'badge-langchain';
       if (e.service === 'tool') srvBadge = 'badge-entity-tool';
+      if (e.service === 'web_app') srvBadge = 'badge-webapp';
 
       const { fromEntity, toEntity } = resolveEntities(e);
-      const dur = e.duration_ms !== undefined ? `${e.duration_ms}ms` : 'N/A';
-      const stat = e.status_code ? e.status_code : 'N/A';
+      const isReq = (e.type || 'request').toLowerCase() === 'request';
+      const dur = e.duration_ms !== undefined ? `${e.duration_ms} ms` : '-';
+      const statCode = e.status_code;
 
-      const metaBar = document.getElementById('modal-meta-bar');
-      metaBar.innerHTML = `
-        <div class="modal-meta-item">From: ${getEntityBadge(fromEntity)}</div>
-        <div class="modal-meta-item">To: ${getEntityBadge(toEntity)}</div>
-        <div class="modal-meta-item">Service: <span class="badge-srv ${srvBadge}">${escapeHtml(e.service || 'unknown')}</span></div>
-        <div class="modal-meta-item">Type: <strong>${escapeHtml(e.type || 'N/A')}</strong></div>
-        <div class="modal-meta-item">Method: <strong>${escapeHtml(e.method || '-')}</strong></div>
-        <div class="modal-meta-item">Route: <code style="color:var(--cyan);">${escapeHtml(e.endpoint || '-')}</code></div>
-        <div class="modal-meta-item">Status: <strong>${stat}</strong></div>
-        <div class="modal-meta-item">Duration: <strong>${dur}</strong></div>
-        <div class="modal-meta-item">Timestamp: <strong>${escapeHtml(e.timestamp || '-')}</strong></div>
-        ${e.request_id ? `<div class="modal-meta-item">Req ID: <code style="color:var(--text-subtle);">${escapeHtml(e.request_id)}</code></div>` : ''}
+      // 1. Header Badges
+      const badgesContainer = document.getElementById('modal-header-badges');
+      let typePill = isReq 
+        ? `<span class="modal-pill modal-pill-req">REQUEST</span>`
+        : (statCode >= 400 
+            ? `<span class="modal-pill modal-pill-err">RESPONSE (${statCode})</span>` 
+            : `<span class="modal-pill modal-pill-resp">RESPONSE ${statCode || ''}</span>`);
+
+      const methodColor = (e.method || e.type || '').toUpperCase().includes('GET') ? 'var(--cyan)' : 'var(--indigo-light)';
+      badgesContainer.innerHTML = `
+        ${typePill}
+        <span class="badge-srv ${srvBadge}">${escapeHtml(e.service || 'unknown')}</span>
+        <span class="modal-pill" style="background:rgba(99,102,241,0.15); color:${methodColor}; border:1px solid rgba(99,102,241,0.3);">${escapeHtml((e.method || (isReq ? 'POST' : 'HTTP')).toUpperCase())}</span>
+        ${statCode ? `<span class="modal-pill" style="background:${statCode < 400 ? 'rgba(16,185,129,0.15)' : 'rgba(244,63,94,0.15)'}; color:${statCode < 400 ? 'var(--emerald)' : 'var(--rose)'}; border:1px solid ${statCode < 400 ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'};">STATUS ${statCode}</span>` : ''}
       `;
 
+      // 2. Structured Metadata Grid with ALL fields
+      const metaGrid = document.getElementById('modal-meta-grid');
+      const fullUrl = e.url || (e.endpoint ? `http://127.0.0.1:8001${e.endpoint}` : '-');
+      const clientStr = e.client || e.client_ip || '127.0.0.1';
+      const httpVer = e.http_version ? `HTTP/${e.http_version}` : 'HTTP/1.1';
+
+      metaGrid.innerHTML = `
+        <div class="modal-field-item">
+          <span class="modal-field-label">Event ID</span>
+          <span class="modal-field-value">
+            <code class="modal-field-copyable" onclick="copyTextToClipboard('${escapeHtml(e.event_id || '')}', this)" title="Click to copy">${escapeHtml(e.event_id || 'N/A')} 📋</code>
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">Request ID</span>
+          <span class="modal-field-value">
+            <code class="modal-field-copyable" onclick="copyTextToClipboard('${escapeHtml(e.request_id || '')}', this)" title="Click to copy">${escapeHtml(e.request_id || 'N/A')} 📋</code>
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">Timestamp (UTC)</span>
+          <span class="modal-field-value">
+            <strong style="color:var(--text-main); font-size:0.8rem;">${escapeHtml(e.timestamp || 'N/A')}</strong>
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">Direction / Entities</span>
+          <span class="modal-field-value">
+            ${getEntityBadge(fromEntity)} <span style="color:var(--text-subtle); margin:0 4px;">➔</span> ${getEntityBadge(toEntity)}
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">Route / Endpoint</span>
+          <span class="modal-field-value">
+            <code style="color:var(--cyan); font-weight:600;">${escapeHtml(e.endpoint || '-')}</code>
+          </span>
+        </div>
+        <div class="modal-field-item" style="grid-column: span 2;">
+          <span class="modal-field-label">Full Request URL</span>
+          <span class="modal-field-value">
+            <code class="modal-field-copyable" onclick="copyTextToClipboard('${escapeHtml(fullUrl)}', this)" title="Click to copy URL" style="color:#A5B4FC; font-size:0.78rem;">${escapeHtml(fullUrl)} 📋</code>
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">Client Host / Port</span>
+          <span class="modal-field-value">
+            <code style="color:var(--text-subtle);">${escapeHtml(clientStr)}</code>
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">HTTP Protocol</span>
+          <span class="modal-field-value">
+            <code style="color:var(--text-subtle);">${escapeHtml(httpVer)}</code>
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">Status Code</span>
+          <span class="modal-field-value">
+            ${statCode ? `<strong style="color:${statCode < 400 ? 'var(--emerald)' : 'var(--rose)'};">${statCode}</strong>` : '<span style="color:var(--text-subtle);">N/A (Request)</span>'}
+          </span>
+        </div>
+        <div class="modal-field-item">
+          <span class="modal-field-label">Duration / Latency</span>
+          <span class="modal-field-value">
+            <strong>${escapeHtml(dur)}</strong> ${e.duration_ms !== undefined ? `<span style="color:var(--text-subtle); font-size:0.75rem;">(${(e.duration_ms / 1000).toFixed(2)}s)</span>` : ''}
+          </span>
+        </div>
+      `;
+
+      // 3. Populate Tab 1: Payload
       const payloadStr = JSON.stringify(e.payload !== undefined ? e.payload : {}, null, 2);
       document.getElementById('modal-payload-content').textContent = payloadStr;
+      document.getElementById('modal-payload-title').textContent = isReq ? 'Request Body / Payload' : 'Response Body / Payload';
 
-      const copyBtn = document.getElementById('modal-copy-btn');
-      copyBtn.textContent = '📋 Copy JSON';
-      copyBtn.style.color = '#A5B4FC';
+      // 4. Populate Tab 2: HTTP Headers
+      const headersContainer = document.getElementById('modal-headers-container');
+      const headersCountBadge = document.getElementById('modal-headers-count');
+      const headers = e.headers;
+      if (headers && typeof headers === 'object' && Object.keys(headers).length > 0) {
+        const headerKeys = Object.keys(headers).sort();
+        headersCountBadge.textContent = headerKeys.length;
+        let tableHtml = `
+          <table class="modal-kv-table">
+            <thead>
+              <tr>
+                <th>Header Name</th>
+                <th>Header Value</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        headerKeys.forEach(k => {
+          tableHtml += `
+            <tr>
+              <td class="modal-kv-key">${escapeHtml(k)}</td>
+              <td class="modal-kv-val"><code>${escapeHtml(String(headers[k]))}</code></td>
+            </tr>
+          `;
+        });
+        tableHtml += `</tbody></table>`;
+        headersContainer.innerHTML = tableHtml;
+      } else {
+        headersCountBadge.textContent = '0';
+        headersContainer.innerHTML = `
+          <div class="modal-empty-hint">
+            No HTTP headers captured for this record. (Headers are captured on live API calls via logging middleware).
+          </div>
+        `;
+      }
+
+      // 5. Populate Tab 3: Query Parameters
+      const paramsContainer = document.getElementById('modal-params-container');
+      const paramsCountBadge = document.getElementById('modal-params-count');
+      const qParams = e.query_params;
+      if (qParams && typeof qParams === 'object' && Object.keys(qParams).length > 0) {
+        const pKeys = Object.keys(qParams);
+        paramsCountBadge.textContent = pKeys.length;
+        let pTableHtml = `
+          <table class="modal-kv-table">
+            <thead>
+              <tr>
+                <th>Parameter Name</th>
+                <th>Parameter Value</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        pKeys.forEach(k => {
+          pTableHtml += `
+            <tr>
+              <td class="modal-kv-key">${escapeHtml(k)}</td>
+              <td class="modal-kv-val"><code>${escapeHtml(String(qParams[k]))}</code></td>
+            </tr>
+          `;
+        });
+        pTableHtml += `</tbody></table>`;
+        paramsContainer.innerHTML = pTableHtml;
+      } else {
+        paramsCountBadge.textContent = '0';
+        paramsContainer.innerHTML = `
+          <div class="modal-empty-hint">
+            No query parameters were provided with this request.
+          </div>
+        `;
+      }
+
+      // 6. Populate Tab 4: Complete Raw Event JSON
+      document.getElementById('modal-raw-content').textContent = JSON.stringify(e, null, 2);
+
+      // Default to payload tab
+      switchModalTab('payload');
+
+      // Reset copy buttons feedback
+      const copyPayloadBtn = document.getElementById('modal-copy-payload-btn');
+      if (copyPayloadBtn) {
+        copyPayloadBtn.textContent = '📋 Copy Payload JSON';
+        copyPayloadBtn.style.color = '#A5B4FC';
+      }
+      const copyRawBtn = document.getElementById('modal-copy-raw-btn');
+      if (copyRawBtn) {
+        copyRawBtn.textContent = '📋 Copy Full Event JSON';
+        copyRawBtn.style.color = '#A5B4FC';
+      }
 
       document.getElementById('log-modal').classList.add('open');
     }
 
     function closeLogModal() {
       document.getElementById('log-modal').classList.remove('open');
-    }
-
-    function copyModalPayload() {
-      const text = document.getElementById('modal-payload-content').textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        const copyBtn = document.getElementById('modal-copy-btn');
-        copyBtn.textContent = '✓ Copied!';
-        copyBtn.style.color = 'var(--emerald)';
-        setTimeout(() => {
-          copyBtn.textContent = '📋 Copy JSON';
-          copyBtn.style.color = '#A5B4FC';
-        }, 2000);
-      });
     }
 
     window.addEventListener('keydown', (e) => {

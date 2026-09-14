@@ -7,6 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="/static/chart.umd.min.js"></script>
+  <script>
+    if (typeof Chart === 'undefined') {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+      document.head.appendChild(s);
+    }
+  </script>
   <style>
     :root {
       --bg-base: #090D16;
@@ -844,6 +852,194 @@
       border-color: rgba(16, 185, 129, 0.5);
       cursor: default;
     }
+
+    /* Telemetry Styles */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .telemetry-stat-card {
+      background: rgba(18, 24, 38, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      box-shadow: var(--glass-shadow);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .telemetry-stat-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+    }
+    .telemetry-stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--primary-gradient);
+    }
+    .telemetry-stat-card.emerald::before {
+      background: linear-gradient(90deg, #10B981, #06B6D4);
+    }
+    .telemetry-stat-card.amber::before {
+      background: linear-gradient(90deg, #F59E0B, #EF4444);
+    }
+    .telemetry-stat-card.rose::before {
+      background: linear-gradient(90deg, #F43F5E, #FB7185);
+    }
+    .telemetry-stat-card.cyan::before {
+      background: linear-gradient(90deg, #06B6D4, #6366F1);
+    }
+    .telemetry-stat-card.purple::before {
+      background: linear-gradient(90deg, #8B5CF6, #EC4899);
+    }
+    .telemetry-stat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .telemetry-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-subtle);
+      letter-spacing: 0.05em;
+    }
+    .telemetry-icon {
+      font-size: 1.25rem;
+      opacity: 0.9;
+    }
+    .telemetry-val {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.2;
+    }
+    .telemetry-subtext {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Dual Charts Grid */
+    .telemetry-charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.25rem;
+    }
+    @media (max-width: 960px) {
+      .telemetry-charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .chart-container-card {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      position: relative;
+    }
+    .chart-container-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chart-container-card p {
+      font-size: 0.78rem;
+      color: var(--text-subtle);
+      margin-bottom: 1rem;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+
+    /* Telemetry Controls Bar */
+    .telemetry-controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 1.25rem;
+      margin-bottom: 0.75rem;
+      padding: 1rem 1.25rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .telemetry-ctrl-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .telemetry-ctrl-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-subtle);
+      letter-spacing: 0.05em;
+    }
+    .custom-date-fields {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      animation: fadeIn 0.25s ease;
+    }
+
+    /* Educational Info Card */
+    .info-metrics-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .info-metric-item {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      position: relative;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .info-metric-item:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      transform: translateY(-2px);
+    }
+    .info-metric-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--cyan);
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .info-metric-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+    .info-metric-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -862,6 +1058,9 @@
         </button>
         <button id="tab-btn-chat" class="tab-btn" onclick="switchTab('chat')">
           <span>💬</span> Chat Console
+        </button>
+        <button id="tab-btn-telemetry" class="tab-btn" onclick="switchTab('telemetry')">
+          <span>📊</span> Telemetry
         </button>
         <button id="tab-btn-logs" class="tab-btn" onclick="switchTab('logs')">
           <span>📋</span> Event Logs
@@ -1080,6 +1279,192 @@
       </div>
     </div>
 
+    <!-- PAGE: Telemetry Dashboard -->
+    <div id="page-telemetry" class="page-content">
+      <!-- 1. Top Statistics Row: Prompts, Responses, Errors, Input Tokens, Output Tokens -->
+      <section class="glass-card" style="padding-bottom: 1.25rem;">
+        <div class="card-title-row">
+          <div>
+            <h2 class="card-title">📊 Inference Telemetry & Runtime Overview</h2>
+            <p class="card-subtitle">
+              Model Performance & Token Throughput Since Model Started
+              <span id="telemetry-session-tag" style="margin-left: 8px; font-family: 'JetBrains Mono', monospace; color: var(--cyan); font-size: 0.8rem;"></span>
+            </p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn btn-primary" style="padding:6px 14px; font-size:0.8rem;" onclick="loadTelemetry()">↻ Refresh Telemetry</button>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <!-- Total Prompts -->
+          <div class="telemetry-stat-card cyan">
+            <div class="telemetry-stat-header">
+              <span class="telemetry-label">Total Prompts</span>
+              <span class="telemetry-icon">📥</span>
+            </div>
+            <div id="telemetry-prompts" class="telemetry-val">0</div>
+            <div class="telemetry-subtext">Requests received by model</div>
+          </div>
+
+          <!-- Total Response -->
+          <div class="telemetry-stat-card emerald">
+            <div class="telemetry-stat-header">
+              <span class="telemetry-label">Total Response</span>
+              <span class="telemetry-icon">📤</span>
+            </div>
+            <div id="telemetry-responses" class="telemetry-val">0</div>
+            <div class="telemetry-subtext">Successful completions</div>
+          </div>
+
+          <!-- Total Errors -->
+          <div class="telemetry-stat-card rose">
+            <div class="telemetry-stat-header">
+              <span class="telemetry-label">Total Errors</span>
+              <span class="telemetry-icon">⚠️</span>
+            </div>
+            <div id="telemetry-errors" class="telemetry-val">0</div>
+            <div class="telemetry-subtext">Failed / HTTP error responses</div>
+          </div>
+
+          <!-- Total Input Tokens -->
+          <div class="telemetry-stat-card amber">
+            <div class="telemetry-stat-header">
+              <span class="telemetry-label">Total Input Tokens</span>
+              <span class="telemetry-icon">🔤</span>
+            </div>
+            <div id="telemetry-input-tokens" class="telemetry-val">0</div>
+            <div class="telemetry-subtext">Prompt tokens received</div>
+          </div>
+
+          <!-- Total Output Tokens -->
+          <div class="telemetry-stat-card purple">
+            <div class="telemetry-stat-header">
+              <span class="telemetry-label">Total Output Tokens</span>
+              <span class="telemetry-icon">✍️</span>
+            </div>
+            <div id="telemetry-output-tokens" class="telemetry-val">0</div>
+            <div class="telemetry-subtext">Generated output tokens</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Dual Graphs Card -->
+      <section class="glass-card">
+        <div class="card-title-row">
+          <div>
+            <h2 class="card-title">📈 Inference Activity & Token Metrics</h2>
+            <p class="card-subtitle">Aggregated requests and tokens plotted over the selected interval and time range</p>
+          </div>
+        </div>
+
+        <!-- Dropdowns Bar: Aggregation/Update Interval, Time Range, and Custom Date Pickers -->
+        <div class="telemetry-controls-bar">
+          <div class="telemetry-ctrl-item">
+            <label for="telemetry-interval" class="telemetry-ctrl-label">Aggregation/Update Interval</label>
+            <select id="telemetry-interval" class="text-input" style="min-width: 175px;" onchange="onTelemetryFilterChange()">
+              <option value="1m">1 min</option>
+              <option value="15m" selected>15 min (default)</option>
+              <option value="1h">1 hr</option>
+              <option value="1d">1 day</option>
+            </select>
+          </div>
+
+          <div class="telemetry-ctrl-item">
+            <label for="telemetry-range" class="telemetry-ctrl-label">Time Range</label>
+            <select id="telemetry-range" class="text-input" style="min-width: 175px;" onchange="onTelemetryRangeChange()">
+              <option value="1h">Last hr</option>
+              <option value="1d" selected>1 day (default)</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+
+          <!-- Custom Date Pickers with dropdown calendar -->
+          <div id="telemetry-custom-dates-box" class="custom-date-fields" style="display: none;">
+            <div class="telemetry-ctrl-item">
+              <label for="telemetry-start-date" class="telemetry-ctrl-label">Starting Date</label>
+              <input type="date" id="telemetry-start-date" class="text-input" onchange="onTelemetryFilterChange()">
+            </div>
+            <div class="telemetry-ctrl-item">
+              <label for="telemetry-end-date" class="telemetry-ctrl-label">Ending Date</label>
+              <input type="date" id="telemetry-end-date" class="text-input" onchange="onTelemetryFilterChange()">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 Side-by-Side Graphs -->
+        <div class="telemetry-charts-grid">
+          <!-- Left Graph: Prompts, Responses and Errors per Interval -->
+          <div class="chart-container-card">
+            <h3><span>📈</span> Prompts, Responses & Errors per Interval</h3>
+            <p>Line graphs showing number of prompts, responses, and errors per Interval selected across the time range</p>
+            <div class="chart-wrapper">
+              <canvas id="telemetry-requests-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Right Graph: Input and Output Tokens per Interval -->
+          <div class="chart-container-card">
+            <h3><span>⚡</span> Input & Output Tokens per Interval</h3>
+            <p>Line graphs showing number of input and output tokens per Interval selected across the time range</p>
+            <div class="chart-wrapper">
+              <canvas id="telemetry-tokens-chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Informational Metrics Card -->
+      <section class="glass-card">
+        <div class="card-title-row">
+          <div>
+            <h2 class="card-title" style="color: var(--amber);">💡 Other Important Statistic not Available for Low Performance Computer:</h2>
+            <p class="card-subtitle">Key inference performance and latency metrics</p>
+          </div>
+        </div>
+
+        <div class="info-metrics-list">
+          <!-- TTFT -->
+          <div class="info-metric-item">
+            <span class="info-metric-badge">TTFT</span>
+            <div class="info-metric-title">Time to First Token (TTFT):</div>
+            <div class="info-metric-desc">
+              The duration between a user sending a prompt and receiving the very first token. This is the most critical metric for perceived speed in streaming applications.
+            </div>
+          </div>
+
+          <!-- ITL -->
+          <div class="info-metric-item">
+            <span class="info-metric-badge">ITL</span>
+            <div class="info-metric-title">Inter-Token Latency (ITL):</div>
+            <div class="info-metric-desc">
+              The average time elapsed between generating each subsequent token.
+            </div>
+          </div>
+
+          <!-- TPS -->
+          <div class="info-metric-item">
+            <span class="info-metric-badge">TPS</span>
+            <div class="info-metric-title">Tokens Per Second (TPS):</div>
+            <div class="info-metric-desc">
+              The throughput speed of the model generation (often measured per request or aggregated across the server).
+            </div>
+          </div>
+
+          <!-- TPOT -->
+          <div class="info-metric-item">
+            <span class="info-metric-badge">TPOT</span>
+            <div class="info-metric-title">Time Per Output Token (TPOT):</div>
+            <div class="info-metric-desc">
+              The total time taken to generate the response divided by the number of output tokens.
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
     <!-- PAGE 3: Live Event Logs -->
     <div id="page-logs" class="page-content">
       <section class="glass-card">
@@ -1161,6 +1546,8 @@
 
       if (tabId === 'logs') {
         loadLogs();
+      } else if (tabId === 'telemetry') {
+        loadTelemetry();
       }
     }
 
@@ -1236,6 +1623,10 @@
         updateModelUI();
         updateChatStatusUI();
         renderCompatibleModels(availableModels, data.gpu);
+
+        if (document.getElementById('page-telemetry')?.classList.contains('active')) {
+          loadTelemetry();
+        }
 
         // Dynamically adjust polling frequency: poll rapidly (1.5s) when loading, relax (6s) when stable
         const modelLoading = data.model_server?.status === 'loading';
@@ -1934,6 +2325,268 @@
 
     function escapeHtml(str) {
       return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // ==========================================
+    // Telemetry Dashboard Logic & Chart.js Hooks
+    // ==========================================
+    let requestsChart = null;
+    let tokensChart = null;
+
+    function onTelemetryRangeChange() {
+      const rangeVal = document.getElementById('telemetry-range').value;
+      const customBox = document.getElementById('telemetry-custom-dates-box');
+      if (rangeVal === 'custom') {
+        customBox.style.display = 'flex';
+        const today = new Date().toISOString().split('T')[0];
+        if (!document.getElementById('telemetry-start-date').value) {
+          const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+          document.getElementById('telemetry-start-date').value = yesterday;
+        }
+        if (!document.getElementById('telemetry-end-date').value) {
+          document.getElementById('telemetry-end-date').value = today;
+        }
+      } else {
+        customBox.style.display = 'none';
+      }
+      loadTelemetry();
+    }
+
+    function onTelemetryFilterChange() {
+      loadTelemetry();
+    }
+
+    async function loadTelemetry() {
+      const intervalEl = document.getElementById('telemetry-interval');
+      const rangeEl = document.getElementById('telemetry-range');
+      if (!intervalEl || !rangeEl) return;
+
+      const interval = intervalEl.value;
+      const range = rangeEl.value;
+      const startDate = document.getElementById('telemetry-start-date')?.value || '';
+      const endDate = document.getElementById('telemetry-end-date')?.value || '';
+
+      let url = `/api/telemetry?interval=${encodeURIComponent(interval)}&range=${encodeURIComponent(range)}`;
+      if (range === 'custom') {
+        if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+        if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+      }
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // 1. Update Top Summary Metrics
+        const s = data.summary || {};
+        document.getElementById('telemetry-prompts').textContent = (s.total_prompts || 0).toLocaleString();
+        document.getElementById('telemetry-responses').textContent = (s.total_responses || 0).toLocaleString();
+        document.getElementById('telemetry-errors').textContent = (s.total_errors || 0).toLocaleString();
+        document.getElementById('telemetry-input-tokens').textContent = (s.total_input_tokens || 0).toLocaleString();
+        document.getElementById('telemetry-output-tokens').textContent = (s.total_output_tokens || 0).toLocaleString();
+
+        const sessionTag = document.getElementById('telemetry-session-tag');
+        if (sessionTag) {
+          if (s.model_started_at) {
+            const dt = new Date(s.model_started_at);
+            sessionTag.textContent = `Active Model: ${s.model_name || 'LLM'} (Started ${dt.toLocaleTimeString()})`;
+          } else if (s.model_name && s.model_name !== 'None') {
+            sessionTag.textContent = `Model: ${s.model_name}`;
+          } else {
+            sessionTag.textContent = '';
+          }
+        }
+
+        // 2. Render Left Graph: Requests per Interval
+        renderRequestsChart(data.series || {});
+
+        // 3. Render Right Graph: Tokens per Interval
+        renderTokensChart(data.series || {});
+      } catch (err) {
+        console.error('Failed to load telemetry data:', err);
+      }
+    }
+
+    function renderRequestsChart(series) {
+      const canvas = document.getElementById('telemetry-requests-chart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      const ctx = canvas.getContext('2d');
+
+      const labels = series.labels || [];
+      const prompts = series.prompts || series.requests || [];
+      const responses = series.responses || [];
+      const errors = series.errors || [];
+
+      if (requestsChart) {
+        requestsChart.data.labels = labels;
+        requestsChart.data.datasets[0].data = prompts;
+        requestsChart.data.datasets[1].data = responses;
+        requestsChart.data.datasets[2].data = errors;
+        requestsChart.update();
+        return;
+      }
+
+      requestsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Prompts',
+              data: prompts,
+              borderColor: '#6366F1',
+              backgroundColor: 'rgba(99, 102, 241, 0.15)',
+              borderWidth: 2.5,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#6366F1',
+            },
+            {
+              label: 'Responses',
+              data: responses,
+              borderColor: '#10B981',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              borderWidth: 2.5,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#10B981',
+            },
+            {
+              label: 'Errors',
+              data: errors,
+              borderColor: '#F43F5E',
+              backgroundColor: 'rgba(244, 63, 94, 0.15)',
+              borderWidth: 2.5,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#F43F5E',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 250 },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: '#94A3B8', boxWidth: 12, padding: 12, font: { family: 'Inter', size: 12, weight: '600' } }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: 'rgba(11, 15, 25, 0.95)',
+              titleColor: '#F1F5F9',
+              bodyColor: '#94A3B8',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              borderWidth: 1,
+              padding: 10,
+              cornerRadius: 8,
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748B', maxRotation: 45, font: { family: 'Inter', size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748B', precision: 0, font: { family: 'Inter', size: 11 } }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTokensChart(series) {
+      const canvas = document.getElementById('telemetry-tokens-chart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      const ctx = canvas.getContext('2d');
+
+      const labels = series.labels || [];
+      const inputTokens = series.input_tokens || [];
+      const outputTokens = series.output_tokens || [];
+
+      if (tokensChart) {
+        tokensChart.data.labels = labels;
+        tokensChart.data.datasets[0].data = inputTokens;
+        tokensChart.data.datasets[1].data = outputTokens;
+        tokensChart.update();
+        return;
+      }
+
+      tokensChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Input Tokens',
+              data: inputTokens,
+              borderColor: '#06B6D4',
+              backgroundColor: 'rgba(6, 182, 212, 0.15)',
+              borderWidth: 2.5,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#06B6D4',
+            },
+            {
+              label: 'Output Tokens',
+              data: outputTokens,
+              borderColor: '#A855F7',
+              backgroundColor: 'rgba(168, 85, 247, 0.15)',
+              borderWidth: 2.5,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#A855F7',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 250 },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: '#94A3B8', boxWidth: 12, padding: 12, font: { family: 'Inter', size: 12, weight: '600' } }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: 'rgba(11, 15, 25, 0.95)',
+              titleColor: '#F1F5F9',
+              bodyColor: '#94A3B8',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              borderWidth: 1,
+              padding: 10,
+              cornerRadius: 8,
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748B', maxRotation: 45, font: { family: 'Inter', size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748B', precision: 0, font: { family: 'Inter', size: 11 } }
+            }
+          }
+        }
+      });
     }
 
     // Initial load

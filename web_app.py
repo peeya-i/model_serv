@@ -6,22 +6,30 @@ import platform
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
 import requests
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 AGENTS_DIR = os.path.join(PROJECT_ROOT, "agents")
 LOGS_FILE = os.path.join(PROJECT_ROOT, "logs", "events.json")
+MODEL_START_TIME_FILE = os.path.join(PROJECT_ROOT, "logs", "model_start_time.txt")
+STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
 VENV_PYTHON = os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
 PYTHON_EXEC = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
 
 app = FastAPI(title="Private LLM & Local Agent Server Console")
+
+# Mount static directory for offline assets like Chart.js
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # In-memory tracking for background processes launched via Web App
 running_processes = {
@@ -789,15 +797,21 @@ def api_start_model(req: StartModelRequest):
         )
         log_fd.close()
 
+        now_ts = time.time()
         running_processes["model"] = {
             "process": proc,
             "model_name": req.model,
             "port": req.port,
             "pid": proc.pid,
-            "started_at": time.time(),
+            "started_at": now_ts,
             "last_exit_code": None,
             "last_error": None,
         }
+        try:
+            with open(MODEL_START_TIME_FILE, "w", encoding="utf-8") as sf:
+                sf.write(str(now_ts))
+        except Exception:
+            pass
         return {
             "status": "started",
             "message": f"Model server initializing for '{req.model}' on port {req.port}. Weights are loading into memory.",
@@ -1066,6 +1080,297 @@ def api_logs():
         except Exception:
             pass
     return []
+
+
+def get_model_start_timestamp() -> Optional[float]:
+    """Returns the UNIX timestamp when the model was started."""
+    # 1. In-memory tracked started_at
+    started_at = running_processes["model"].get("started_at")
+    if started_at:
+        return started_at
+
+    # 2. File-persisted start time
+    if os.path.exists(MODEL_START_TIME_FILE):
+        try:
+            with open(MODEL_START_TIME_FILE, "r", encoding="utf-8") as f:
+                val = float(f.read().strip())
+                if val > 0:
+                    running_processes["model"]["started_at"] = val
+                    return val
+        except Exception:
+            pass
+
+    # 3. If model server is active on port 8001, retrieve process start time
+    try:
+        health = check_model_server_health(running_processes["model"].get("port", 8001))
+        if health["healthy"]:
+            try:
+                out = subprocess.check_output(
+                    ["lsof", "-ti", f":{running_processes['model'].get('port', 8001)}"],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                )
+                pids = [int(p.strip()) for p in out.strip().split() if p.strip().isdigit()]
+                if pids:
+                    pid = pids[0]
+                    stat_path = f"/proc/{pid}/stat"
+                    if os.path.exists(stat_path):
+                        with open(stat_path, "r") as sf:
+                            fields = sf.read().split()
+                        boot_time = 0
+                        with open("/proc/stat", "r") as pf:
+                            for line in pf:
+                                if line.startswith("btime "):
+                                    boot_time = float(line.split()[1])
+                                    break
+                        clk_tck = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
+                        proc_start = boot_time + (float(fields[21]) / clk_tck)
+                        running_processes["model"]["started_at"] = proc_start
+                        return proc_start
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return None
+
+
+@app.get("/api/telemetry")
+def api_telemetry(
+    request: Request,
+    interval: str = "15m",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    """
+    Returns:
+      1. Top summary metrics (Prompts, Responses, Errors, Input Tokens, Output Tokens)
+         calculated since the model started.
+      2. Time-bucketed series for Requests and Tokens graphs according to interval & time range.
+    """
+    req_range = request.query_params.get("range") or request.query_params.get("time_range") or "1d"
+    effective_range = req_range.lower()
+    # 1. Parse all events
+    events = []
+    if os.path.exists(LOGS_FILE):
+        try:
+            with open(LOGS_FILE, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    raw_events = json.loads(content)
+                    if isinstance(raw_events, list):
+                        events = raw_events
+        except Exception:
+            events = []
+
+    # 2. Filter model events (service == 'llm' and ignore non-inference endpoints)
+    ignored_endpoints = {"/health", "/ping", "/healthz", "/v1/models", "/api/status"}
+    model_events = []
+    for e in events:
+        if str(e.get("service", "")).lower() == "llm":
+            ep = str(e.get("endpoint", "")).lower()
+            if ep in ignored_endpoints or ep.startswith(("/health", "/ping")):
+                continue
+            ts_str = e.get("timestamp")
+            if not ts_str:
+                continue
+            try:
+                dt = datetime.fromisoformat(ts_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                model_events.append((dt, e))
+            except Exception:
+                continue
+
+    # Sort model events by timestamp
+    model_events.sort(key=lambda x: x[0])
+
+    # 3. Calculate Top Statistics since model started
+    model_start_ts = get_model_start_timestamp()
+    start_dt = None
+    if model_start_ts:
+        start_dt = datetime.fromtimestamp(model_start_ts, tz=timezone.utc)
+
+    # If model is running with a start_dt, count events since start_dt.
+    # If no events occurred after start_dt yet or if model_start_ts is absent, compute across existing model events.
+    if start_dt:
+        events_after_start = [e for dt, e in model_events if dt >= start_dt]
+        since_start_events = events_after_start if events_after_start else [e for _, e in model_events]
+    else:
+        since_start_events = [e for _, e in model_events]
+
+    total_prompts = 0
+    total_responses = 0
+    total_errors = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
+
+    for e in since_start_events:
+        etype = str(e.get("type", "")).lower()
+        if etype == "request":
+            total_prompts += 1
+        elif etype == "response":
+            status_code = e.get("status_code", 200)
+            payload = e.get("payload") or {}
+            is_err = status_code >= 400 or (isinstance(payload, dict) and "error" in payload)
+            if is_err:
+                total_errors += 1
+            else:
+                total_responses += 1
+
+            if isinstance(payload, dict):
+                usage = payload.get("usage") or {}
+                if isinstance(usage, dict):
+                    in_tok = usage.get("prompt_tokens") or 0
+                    out_tok = usage.get("completion_tokens") or 0
+                    total_input_tokens += int(in_tok)
+                    total_output_tokens += int(out_tok)
+
+    # 4. Determine Time Range for Graphs
+    now = datetime.now(timezone.utc)
+    interval_map = {
+        "1m": 60,
+        "15m": 15 * 60,
+        "1h": 3600,
+        "1d": 86400,
+    }
+    interval_sec = interval_map.get(interval.lower(), 15 * 60)
+
+    range_lower = effective_range
+    if range_lower == "1h":
+        t_end = now
+        t_start = now - timedelta(hours=1)
+    elif range_lower == "1d":
+        t_end = now
+        t_start = now - timedelta(days=1)
+    elif range_lower in ["week", "7d"]:
+        t_end = now
+        t_start = now - timedelta(days=7)
+    elif range_lower in ["month", "30d"]:
+        t_end = now
+        t_start = now - timedelta(days=30)
+    elif range_lower == "custom":
+        try:
+            if start_date:
+                if len(start_date) == 10:  # YYYY-MM-DD
+                    t_start = datetime.fromisoformat(f"{start_date}T00:00:00").replace(tzinfo=timezone.utc)
+                else:
+                    t_start = datetime.fromisoformat(start_date)
+                    if t_start.tzinfo is None:
+                        t_start = t_start.replace(tzinfo=timezone.utc)
+            else:
+                t_start = now - timedelta(days=1)
+
+            if end_date:
+                if len(end_date) == 10:  # YYYY-MM-DD
+                    t_end = datetime.fromisoformat(f"{end_date}T23:59:59").replace(tzinfo=timezone.utc)
+                else:
+                    t_end = datetime.fromisoformat(end_date)
+                    if t_end.tzinfo is None:
+                        t_end = t_end.replace(tzinfo=timezone.utc)
+            else:
+                t_end = now
+
+            if t_start > t_end:
+                t_start, t_end = t_end, t_start
+        except Exception:
+            t_start = now - timedelta(days=1)
+            t_end = now
+    else:
+        t_start = now - timedelta(days=1)
+        t_end = now
+
+    # 5. Build Time Buckets for the Time Range
+    total_duration_sec = max(interval_sec, (t_end - t_start).total_seconds())
+    bucket_count = int(total_duration_sec // interval_sec) + 1
+    # Cap bucket count to 500 to keep UI ultra smooth
+    if bucket_count > 500:
+        bucket_count = 500
+        interval_sec = total_duration_sec / bucket_count
+
+    bucket_labels = []
+    bucket_prompts = [0] * bucket_count
+    bucket_responses = [0] * bucket_count
+    bucket_errors = [0] * bucket_count
+    bucket_input_tokens = [0] * bucket_count
+    bucket_output_tokens = [0] * bucket_count
+    bucket_total_tokens = [0] * bucket_count
+
+    start_ts = t_start.timestamp()
+    end_ts = t_end.timestamp()
+
+    # Determine date formatting style
+    is_multi_day = (t_end - t_start).total_seconds() > 86400
+
+    for i in range(bucket_count):
+        b_time = datetime.fromtimestamp(start_ts + (i * interval_sec), tz=timezone.utc)
+        if interval_sec >= 86400:
+            label = b_time.strftime("%b %d")
+        elif is_multi_day:
+            label = b_time.strftime("%b %d %H:%M")
+        else:
+            label = b_time.strftime("%H:%M")
+        bucket_labels.append(label)
+
+    # Populate buckets from model events within [t_start, t_end]
+    for dt, e in model_events:
+        evt_ts = dt.timestamp()
+        if start_ts <= evt_ts <= end_ts:
+            idx = int((evt_ts - start_ts) / interval_sec)
+            if 0 <= idx < bucket_count:
+                etype = str(e.get("type", "")).lower()
+                if etype == "request":
+                    bucket_prompts[idx] += 1
+                elif etype == "response":
+                    status_code = e.get("status_code", 200)
+                    payload = e.get("payload") or {}
+                    if status_code >= 400 or (isinstance(payload, dict) and "error" in payload):
+                        bucket_errors[idx] += 1
+                    else:
+                        bucket_responses[idx] += 1
+
+                    if isinstance(payload, dict):
+                        usage = payload.get("usage") or {}
+                        if isinstance(usage, dict):
+                            in_tok = int(usage.get("prompt_tokens") or 0)
+                            out_tok = int(usage.get("completion_tokens") or 0)
+                            tot_tok = int(usage.get("total_tokens") or (in_tok + out_tok))
+                            bucket_input_tokens[idx] += in_tok
+                            bucket_output_tokens[idx] += out_tok
+                            bucket_total_tokens[idx] += tot_tok
+
+    model_info = running_processes.get("model", {})
+    model_name = model_info.get("model_name") or "None"
+    uptime_sec = int(now.timestamp() - model_start_ts) if model_start_ts else 0
+
+    return {
+        "summary": {
+            "total_prompts": total_prompts,
+            "total_responses": total_responses,
+            "total_errors": total_errors,
+            "total_input_tokens": total_input_tokens,
+            "total_output_tokens": total_output_tokens,
+            "model_name": model_name,
+            "model_started_at": start_dt.isoformat() if start_dt else None,
+            "uptime_seconds": uptime_sec if uptime_sec > 0 else None,
+        },
+        "series": {
+            "labels": bucket_labels,
+            "requests": bucket_prompts,
+            "prompts": bucket_prompts,
+            "responses": bucket_responses,
+            "errors": bucket_errors,
+            "input_tokens": bucket_input_tokens,
+            "output_tokens": bucket_output_tokens,
+            "total_tokens": bucket_total_tokens,
+        },
+        "query": {
+            "interval": interval,
+            "range": effective_range,
+            "start": t_start.isoformat(),
+            "end": t_end.isoformat(),
+        }
+    }
 
 
 TEMPLATES_DIR = os.path.join(PROJECT_ROOT, "templates")

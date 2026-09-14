@@ -425,8 +425,15 @@ if __name__ == "__main__":
             "--tool-call-parser", "llama3_json",
         ])
     
-    args = parser.parse_args(custom_args)
-    validate_parsed_serve_args(args)
-    
-    # 3. Initialize and run the high-performance async inference engine
+    # 3. Record model startup time for telemetry
+    try:
+        import time
+        start_time_file = os.path.join(project_dir, "logs", "model_start_time.txt")
+        os.makedirs(os.path.dirname(start_time_file), exist_ok=True)
+        with open(start_time_file, "w", encoding="utf-8") as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
+
+    # Initialize and run the high-performance async inference engine
     uvloop.run(run_server(args))

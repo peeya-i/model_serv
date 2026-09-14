@@ -5,6 +5,7 @@ import signal
 import platform
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
@@ -617,6 +618,10 @@ class ChatQueryRequest(BaseModel):
     temperature: Optional[float] = 0.7
 
 
+class TerminateAppRequest(BaseModel):
+    shutdown_web: bool = False
+
+
 # API Endpoints
 @app.get("/api/system/gpu")
 def api_gpu_info():
@@ -941,6 +946,44 @@ def api_stop_agent(req: Optional[StopAgentRequest] = None):
     stopped_name = running_processes["agent"].get("agent_file") or (req.agent_file if req else "agent")
     stop_running_agent(target_port)
     return {"status": "stopped", "message": f"Agent '{stopped_name}' stopped"}
+
+
+@app.post("/api/app/terminate")
+def api_terminate_app(req: Optional[TerminateAppRequest] = None):
+    """Terminates model serving and agent serving, freeing all GPU and process resources."""
+    shutdown_web = req.shutdown_web if req else False
+    stopped_services = []
+
+    # 1. Shutdown model serving
+    try:
+        api_stop_model()
+        stopped_services.append("Model Serving")
+    except Exception as e:
+        print(f"[Warning] Error stopping model server during termination: {e}", flush=True)
+
+    # 2. Shutdown agent serving
+    try:
+        stop_running_agent()
+        stopped_services.append("Agent Serving")
+    except Exception as e:
+        print(f"[Warning] Error stopping agent server during termination: {e}", flush=True)
+
+    # 3. Terminate any lingering vLLM worker processes
+    kill_lingering_vllm_processes()
+
+    # 4. Optional web server shutdown
+    if shutdown_web:
+        def _delayed_exit():
+            time.sleep(0.5)
+            os.kill(os.getpid(), signal.SIGINT)
+        threading.Thread(target=_delayed_exit, daemon=True).start()
+
+    return {
+        "status": "terminated",
+        "shutdown_web": shutdown_web,
+        "message": f"Successfully shut down: {', '.join(stopped_services)}.",
+        "services": stopped_services,
+    }
 
 
 @app.post("/api/chat")

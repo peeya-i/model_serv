@@ -43,6 +43,27 @@ import platform
 import subprocess
 import event_logger
 
+def apply_turing_triton_patch():
+    """Dynamically patches vLLM's Triton unified attention kernel for Turing (sm_75) GPUs.
+    Turing GPUs have a 64KB shared memory hardware limit. For models running in float32
+    with head_dim >= 256 (like Gemma 2), the default tile size of 32 requires 80KB shared memory,
+    causing Triton to throw OutOfResources. Patching the tile size to 16 reduces shared memory
+    to 48KB so it compiles and runs cleanly without modifying any library files in site-packages."""
+    try:
+        import vllm.v1.attention.ops.triton_unified_attention as tua
+        _orig_get_tile_size = tua._get_tile_size
+
+        def _turing_get_tile_size(head_size: int, sliding_window: int, element_size: int, is_prefill: bool) -> int:
+            if is_prefill and element_size >= 4 and head_size >= 256:
+                return 16
+            return _orig_get_tile_size(head_size, sliding_window, element_size, is_prefill)
+
+        tua._get_tile_size = _turing_get_tile_size
+    except Exception as e:
+        print(f"[Warning] Failed to apply Turing Triton patch: {e}", flush=True)
+
+apply_turing_triton_patch()
+
 
 
 def get_available_models(models_dir: str) -> list[tuple[str, str, int]]:
@@ -398,8 +419,17 @@ if __name__ == "__main__":
     # Dynamic cpu-offload-gb based on model size:
     # TinyLlama (1.1B) is only ~2.05 GB and fits entirely inside 6GB GPU VRAM with plenty of KV cache room.
     # Forcing CPU offload on 1B models triggers UVAOffloader over PCIe, slowing token generation down to ~2 tokens/sec.
-    # For larger 3B models, offloading ~3GB prevents GPU memory exhaustion on 6GB cards.
+    is_gemma = "gemma" in selected_model.lower()
     needs_cpu_offload = "tinyllama" not in selected_model.lower()
+
+    # Gemma 2 rejects float16 due to soft-capping instability and falls back to float32 on Turing (sm_75).
+    # In float32 it requires ~10.4GB, so we offload 7.5GB to CPU RAM. For other models, float16 is used.
+    model_dtype = "auto" if is_gemma else "float16"
+
+    if is_gemma:
+        max_model_len = "1536"
+
+    gpu_mem_util = "0.72" if is_gemma else "0.85"
 
     # Define exact private runtime specifications
     custom_args = [
@@ -411,11 +441,14 @@ if __name__ == "__main__":
         "--middleware", "event_logger.vllm_logging_middleware", # Complete request/response event logging
         "--no-enable-log-requests",                   # Privacy setting: Never write prompts to logs
         "--enforce-eager",                           # Avoid CUDA graph memory overhead if needed
-        "--gpu-memory-utilization", "0.85",          # Cap GPU utilization safely
+        "--gpu-memory-utilization", gpu_mem_util,    # Cap GPU utilization safely with headroom for activations
         "--max-model-len", max_model_len,            # Set dynamically based on model loaded
         "--attention-backend", "TRITON_ATTN",         # Explicitly use Triton attention for Turing (sm_75) GPUs
+        "--dtype", model_dtype,
     ]
-    if needs_cpu_offload:
+    if is_gemma:
+        custom_args.extend(["--cpu-offload-gb", "7.5"])
+    elif needs_cpu_offload:
         custom_args.extend(["--cpu-offload-gb", "3"])
 
     # Only Llama 3.2 tokenizers provide the special tokens required by this parser.
@@ -425,6 +458,9 @@ if __name__ == "__main__":
             "--tool-call-parser", "llama3_json",
         ])
     
+    args = parser.parse_args(custom_args)
+    validate_parsed_serve_args(args)
+
     # 3. Record model startup time for telemetry
     try:
         import time

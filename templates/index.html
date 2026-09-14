@@ -49,15 +49,35 @@
       background-attachment: fixed;
     }
 
-    /* Top Navigation Tabs Header */
+    /* Top Navigation Tabs Header - Dynamic Console State */
     header {
-      background: rgba(11, 15, 25, 0.85);
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.95), rgba(4, 120, 87, 0.90));
       backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid rgba(16, 185, 129, 0.5);
       position: sticky;
       top: 0;
       z-index: 100;
       padding: 0 2rem;
+      transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+    }
+    header.console-active {
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.95), rgba(4, 120, 87, 0.90));
+      border-bottom: 1px solid rgba(16, 185, 129, 0.5);
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+    }
+    header.console-inactive {
+      background: linear-gradient(135deg, rgba(136, 19, 55, 0.96), rgba(190, 18, 60, 0.92)) !important;
+      border-bottom: 1px solid rgba(244, 63, 94, 0.7) !important;
+      box-shadow: 0 4px 20px rgba(244, 63, 94, 0.4) !important;
+    }
+    header.console-active .tabs-group {
+      background: rgba(0, 0, 0, 0.25);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    header.console-inactive .tabs-group {
+      background: rgba(0, 0, 0, 0.35);
+      border-color: rgba(255, 255, 255, 0.2);
     }
     .nav-container {
       max-width: 1280px;
@@ -116,6 +136,50 @@
       background: var(--primary-gradient);
       color: #fff;
       box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-terminate {
+      background: rgba(225, 29, 72, 0.35);
+      color: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    .btn-terminate:hover {
+      background: rgba(225, 29, 72, 0.65);
+      color: #FFFFFF;
+      border-color: rgba(255, 255, 255, 0.55);
+      box-shadow: 0 0 14px rgba(225, 29, 72, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-terminate:active {
+      transform: translateY(0);
+    }
+    .btn-terminate:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Top Bar LLM Status - Matching Stop App Button Text & Border */
+    #top-model-status-pill {
+      color: #FFFFFF !important;
+      border: 1px solid rgba(255, 255, 255, 0.35) !important;
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+    #top-model-status-pill #top-model-text {
+      color: #FFFFFF !important;
     }
 
     /* Main Container */
@@ -1045,7 +1109,7 @@
 <body>
 
   <!-- Top Navigation with 3 Tabs -->
-  <header>
+  <header id="main-header" class="console-active">
     <div class="nav-container">
       <div class="brand">
         <div class="brand-badge">⚡</div>
@@ -1072,10 +1136,9 @@
           <span id="top-model-dot" class="dot inactive"></span>
           <span id="top-model-text">LLM: Stopped</span>
         </div>
-        <div id="system-status-pill" class="status-badge active">
-          <span class="dot active"></span>
-          <span>Web Console Active</span>
-        </div>
+        <button id="btn-terminate-app" class="btn-terminate" onclick="openTerminateModal()" title="Shutdown model serving and agent serving">
+          <span style="font-size: 0.95rem;">🛑</span> Stop App
+        </button>
       </div>
     </div>
   </header>
@@ -1529,6 +1592,40 @@
       </div>
     </div>
 
+    <!-- Modal: Stop App Confirmation -->
+    <div id="terminate-modal" class="modal-overlay" onclick="if(event.target===this) closeTerminateModal()">
+      <div class="modal-window" style="max-width: 520px;">
+        <div class="modal-header">
+          <div class="modal-title" style="color: var(--rose); display:flex; align-items:center; gap:8px;">
+            <span>🛑</span> Stop Application
+          </div>
+          <button class="modal-close-btn" onclick="closeTerminateModal()" title="Close (Esc)">✕</button>
+        </div>
+        <div class="modal-body" style="padding: 20px; font-size: 0.95rem; line-height: 1.6; color: var(--text-main);">
+          <p style="margin-bottom: 14px;">
+            Are you sure you want to stop the application? This will immediately:
+          </p>
+          <div style="background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
+            <ul style="margin-left: 20px; color: var(--text-muted); font-size: 0.88rem;">
+              <li style="margin-bottom: 6px;"><strong style="color:#FFF;">Shutdown Model Serving:</strong> Stop active LLM process, release port 8001, and completely free GPU VRAM.</li>
+              <li style="margin-bottom: 6px;"><strong style="color:#FFF;">Shutdown Agent Serving:</strong> Stop active Agent server and release port 8002.</li>
+              <li><strong style="color:#FFF;">Process Cleanup:</strong> Clean up any lingering vLLM engine workers.</li>
+            </ul>
+          </div>
+          <label style="display:flex; align-items:center; gap:10px; font-size: 0.88rem; color: var(--text-muted); cursor:pointer; user-select:none; background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);">
+            <input type="checkbox" id="terminate-shutdown-web" style="width:16px; height:16px; accent-color: var(--rose);">
+            <span>Also stop the Web Server process (quits python console)</span>
+          </label>
+        </div>
+        <div class="modal-footer" style="padding: 14px 20px; display:flex; justify-content:flex-end; gap: 10px; border-top: 1px solid var(--border);">
+          <button class="btn btn-secondary" onclick="closeTerminateModal()" style="padding: 8px 16px; border-radius: 8px; font-weight:600; cursor:pointer;">Cancel</button>
+          <button id="btn-do-terminate" class="btn-terminate" onclick="executeTerminateApp()" style="padding: 8px 20px; border-radius: 8px; background: linear-gradient(135deg, #E11D48, #BE123C); color: #FFF; border:none; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow: 0 4px 14px rgba(225,29,72,0.4);">
+            <span>🛑</span> Stop Now
+          </button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
@@ -1555,13 +1652,31 @@
     let availableAgents = [];
     let availableModels = [];
 
+    // Console Active state updater (turns top bar green when active, red when inactive)
+    function setConsoleActiveStatus(isActive) {
+      const header = document.getElementById('main-header') || document.querySelector('header');
+      if (!header) return;
+      if (isActive) {
+        header.classList.remove('console-inactive');
+        header.classList.add('console-active');
+      } else {
+        header.classList.remove('console-active');
+        header.classList.add('console-inactive');
+      }
+    }
+
+    window.addEventListener('offline', () => setConsoleActiveStatus(false));
+    window.addEventListener('online', () => setConsoleActiveStatus(true));
+
     // Fetch Status and GPU Info
     let refreshTimer = null;
 
     async function refreshStatus() {
       try {
         const res = await fetch('/api/status');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
+        setConsoleActiveStatus(true);
         currentStatusData = data;
         
         // 1. Update GPU Panel
@@ -1638,8 +1753,9 @@
 
       } catch (e) {
         console.error("Status update error:", e);
+        setConsoleActiveStatus(false);
         if (refreshTimer) clearTimeout(refreshTimer);
-        refreshTimer = setTimeout(refreshStatus, 6000);
+        refreshTimer = setTimeout(refreshStatus, 4000);
       }
     }
 
@@ -2320,8 +2436,85 @@
     }
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeLogModal();
+      if (e.key === 'Escape') {
+        closeLogModal();
+        closeTerminateModal();
+      }
     });
+
+    // Terminate App Modal & Execution
+    function openTerminateModal() {
+      const modal = document.getElementById('terminate-modal');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeTerminateModal() {
+      const modal = document.getElementById('terminate-modal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function executeTerminateApp() {
+      const btn = document.getElementById('btn-do-terminate');
+      const alsoWeb = document.getElementById('terminate-shutdown-web')?.checked || false;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> Stopping...';
+      }
+
+      try {
+        if (alsoWeb) {
+          setConsoleActiveStatus(false);
+        }
+        const res = await fetch('/api/app/terminate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shutdown_web: alsoWeb })
+        });
+        const data = await res.json();
+        closeTerminateModal();
+
+        if (alsoWeb) {
+          setConsoleActiveStatus(false);
+          document.body.innerHTML = `
+            <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 2rem; background: #090D16; color: #F1F5F9; font-family: 'Inter', sans-serif;">
+              <div style="width: 68px; height: 68px; border-radius: 18px; background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.4); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; margin-bottom: 1.5rem; box-shadow: 0 0 24px rgba(244,63,94,0.3);">🛑</div>
+              <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 0.75rem;">Application Stopped</h1>
+              <p style="font-size: 1.05rem; color: #94A3B8; max-width: 520px; margin-bottom: 1.5rem; line-height: 1.6;">
+                Model serving, agent serving, and the web console process have been cleanly shut down. All GPU VRAM and port resources have been freed.
+              </p>
+              <div style="display:inline-block; padding: 6px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); font-size: 0.85rem; color: #64748B;">
+                You may safely close this browser window or tab.
+              </div>
+            </div>
+          `;
+        } else {
+          refreshStatus();
+          alert("✅ " + (data.message || "Model serving and agent serving have been cleanly stopped."));
+        }
+      } catch (err) {
+        console.error("Stop application error:", err);
+        if (alsoWeb) {
+          setConsoleActiveStatus(false);
+          document.body.innerHTML = `
+            <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 2rem; background: #090D16; color: #F1F5F9; font-family: 'Inter', sans-serif;">
+              <div style="width: 68px; height: 68px; border-radius: 18px; background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.4); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; margin-bottom: 1.5rem;">🛑</div>
+              <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 0.75rem;">Application Stopped</h1>
+              <p style="font-size: 1.05rem; color: #94A3B8; max-width: 520px; margin-bottom: 1.5rem; line-height: 1.6;">
+                Model serving, agent serving, and the server process have been shut down.
+              </p>
+              <p style="font-size: 0.85rem; color: #64748B;">You can safely close this browser window.</p>
+            </div>
+          `;
+        } else {
+          alert("Failed to stop application: " + err.message);
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>🛑</span> Stop Now';
+        }
+      }
+    }
 
     function escapeHtml(str) {
       return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

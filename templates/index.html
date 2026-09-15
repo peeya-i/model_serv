@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Private LLM & Local Agent Hub</title>
+  <link rel="icon" type="image/png" href="/static/AI_serv_32.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -105,6 +106,14 @@
       justify-content: center;
       font-size: 1.1rem;
       box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+    }
+    .brand-icon-img {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      object-fit: contain;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+      display: block;
     }
     .tabs-group {
       display: flex;
@@ -1257,7 +1266,7 @@
   <header id="main-header" class="console-active">
     <div class="nav-container">
       <div class="brand">
-        <div class="brand-badge">⚡</div>
+        <img src="/static/AI_serv_48.png" alt="Private LLM & Agent Hub" class="brand-icon-img" width="36" height="36">
         <span>Private LLM & Agent Hub</span>
       </div>
 
@@ -1305,27 +1314,26 @@
           </div>
         </div>
 
-        <div class="config-line" style="flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
-          <div style="flex: 1; min-width: 280px;">
-            <label for="agent-select" style="display:block; font-size: 0.75rem; color: var(--text-subtle); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
-              Agent Selection (Dropdown)
-            </label>
-            <select id="agent-select" class="text-input" style="width: 100%; font-family: 'JetBrains Mono', monospace;" onchange="onAgentSelectChange()">
+        <div class="config-line" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
+          <label for="agent-select" style="display:block; font-size: 0.75rem; color: var(--text-subtle); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+            Agent Selection (Dropdown)
+          </label>
+          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <select id="agent-select" class="text-input" style="flex: 1; min-width: 280px; font-family: 'JetBrains Mono', monospace;" onchange="onAgentSelectChange()">
               <option value="">Scanning agents/ folder...</option>
             </select>
-            <div id="agent-desc-text" style="font-size: 0.8rem; color: var(--text-subtle); margin-top: 6px;">
-              Loading agent microservice details...
+            <div class="line-actions" style="display: flex; align-items: center; gap: 1rem; flex-shrink: 0;">
+              <div class="port-box">
+                <span class="port-label">Port</span>
+                <input type="number" id="agent-port-input" class="port-input" value="8001">
+              </div>
+              <button id="btn-agent-toggle" class="btn btn-enable" onclick="toggleSelectedAgent()">
+                <span>▶</span> Enable Agent
+              </button>
             </div>
           </div>
-
-          <div class="line-actions" style="display: flex; align-items: center; gap: 1rem;">
-            <div class="port-box">
-              <span class="port-label">Port</span>
-              <input type="number" id="agent-port-input" class="port-input" value="8002">
-            </div>
-            <button id="btn-agent-toggle" class="btn btn-enable" onclick="toggleSelectedAgent()">
-              <span>▶</span> Enable Agent
-            </button>
+          <div id="agent-desc-text" style="font-size: 0.8rem; color: var(--text-subtle); margin-top: 2px;">
+            Loading agent microservice details...
           </div>
         </div>
       </section>
@@ -1426,7 +1434,7 @@
           <div class="line-actions" style="display:flex; align-items:center; gap:1rem; margin-top:1.45rem; flex-wrap:wrap;">
             <div class="port-box">
               <span class="port-label">Port</span>
-              <input type="number" id="model-port-input" class="port-input" value="8001">
+              <input type="number" id="model-port-input" class="port-input" value="8000">
             </div>
             <button id="btn-model-toggle" class="btn btn-enable" style="white-space:nowrap;" onclick="toggleModelServer()">
               <span>▶</span> Start Model
@@ -1459,8 +1467,8 @@
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="font-size:0.8rem; color:var(--text-subtle);">Target:</span>
               <select id="chat-target-select" class="text-input" style="padding:4px 10px; font-size:0.8rem; width:170px;" onchange="updateChatStatusUI()">
-                <option value="model">Direct Model (:8001)</option>
-                <option value="agent">Server Agent (:8002)</option>
+                <option value="model">Direct Model (:8000)</option>
+                <option value="agent">Server Agent (:8001)</option>
               </select>
             </div>
             <!-- Pinned Temperature Configuration Control (will not scroll out) -->
@@ -1802,8 +1810,8 @@
           </p>
           <div style="background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
             <ul style="margin-left: 20px; color: var(--text-muted); font-size: 0.88rem;">
-              <li style="margin-bottom: 6px;"><strong style="color:#FFF;">Shutdown Model Serving:</strong> Stop active LLM process, release port 8001, and completely free GPU VRAM.</li>
-              <li style="margin-bottom: 6px;"><strong style="color:#FFF;">Shutdown Agent Serving:</strong> Stop active Agent server and release port 8002.</li>
+              <li style="margin-bottom: 6px;"><strong style="color:#FFF;">Shutdown Model Serving:</strong> Stop active LLM process, release port 8000, and completely free GPU VRAM.</li>
+              <li style="margin-bottom: 6px;"><strong style="color:#FFF;">Shutdown Agent Serving:</strong> Stop active Agent server and release port 8001.</li>
               <li><strong style="color:#FFF;">Process Cleanup:</strong> Clean up any lingering vLLM engine workers.</li>
             </ul>
           </div>
@@ -2021,8 +2029,8 @@
       }
 
       const activeAgent = currentStatusData?.active_agent || { status: 'stopped', running: false };
-      const port = parseInt(document.getElementById('agent-port-input').value) || 8002;
-      const modelPort = parseInt(document.getElementById('model-port-input').value) || 8001;
+      const port = parseInt(document.getElementById('agent-port-input').value) || 8001;
+      const modelPort = parseInt(document.getElementById('model-port-input').value) || 8000;
 
       if (activeAgent.is_alive && activeAgent.agent_file === selectedAgentFile) {
         // Disable running or loading agent
@@ -2190,7 +2198,7 @@
     async function toggleModelServer() {
       const modelServer = currentStatusData?.model_server || { status: 'stopped', running: false };
       const status = modelServer.status || (modelServer.running ? 'ready' : 'stopped');
-      const portInput = parseInt(document.getElementById('model-port-input').value) || 8001;
+      const portInput = parseInt(document.getElementById('model-port-input').value) || 8000;
       const modelText = document.getElementById('model-text-input').value.trim();
       const modelToUse = modelText || "models/Llama-3.2-3B-Instruct";
 
@@ -2387,8 +2395,8 @@
       if (!text) return;
 
       const target = document.getElementById('chat-target-select').value;
-      const agentPort = parseInt(document.getElementById('agent-port-input').value) || 8002;
-      const modelPort = parseInt(document.getElementById('model-port-input').value) || 8001;
+      const agentPort = parseInt(document.getElementById('agent-port-input').value) || 8001;
+      const modelPort = parseInt(document.getElementById('model-port-input').value) || 8000;
       const targetPort = target === 'agent' ? agentPort : modelPort;
 
       // Check if target is ready before sending
@@ -2664,7 +2672,8 @@
 
       // 2. Structured Metadata Grid with ALL fields
       const metaGrid = document.getElementById('modal-meta-grid');
-      const fullUrl = e.url || (e.endpoint ? `http://127.0.0.1:8001${e.endpoint}` : '-');
+      const fallbackPort = (e.service === 'agent' || e.service === 'langchain_agent') ? 8001 : 8000;
+      const fullUrl = e.url || (e.endpoint ? `http://127.0.0.1:${fallbackPort}${e.endpoint}` : '-');
       const clientStr = e.client || e.client_ip || '127.0.0.1';
       const httpVer = e.http_version ? `HTTP/${e.http_version}` : 'HTTP/1.1';
 

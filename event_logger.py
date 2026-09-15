@@ -126,7 +126,7 @@ def create_logging_middleware(service_name: str) -> Callable:
     """Creates a FastAPI/Starlette HTTP middleware that captures complete request and response payloads."""
     from starlette.concurrency import iterate_in_threadpool
     from starlette.requests import Request
-    from starlette.responses import Response
+    from starlette.responses import JSONResponse, Response
 
     async def logging_middleware(request: Request, call_next: Callable) -> Response:
         # Avoid double-logging if middleware is attached multiple times
@@ -207,6 +207,116 @@ def create_logging_middleware(service_name: str) -> Callable:
         })
 
         start_time = time.perf_counter()
+
+        # Compatibility handler: allow callers querying /api/chat directly against the Model Server
+        if service_name == "llm" and request.method == "POST" and request.url.path == "/api/chat":
+            target = req_payload.get("target", "model") if isinstance(req_payload, dict) else "model"
+            if target == "agent":
+                agent_port = (req_payload.get("port") if isinstance(req_payload, dict) else None) or 8001
+                agent_url = f"http://127.0.0.1:{agent_port}/agent/chat"
+                agent_body = {"prompt": req_payload.get("prompt", "") if isinstance(req_payload, dict) else ""}
+                if isinstance(req_payload, dict) and req_payload.get("temperature") is not None:
+                    agent_body["temperature"] = req_payload["temperature"]
+                try:
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        sub_resp = await client.post(agent_url, json=agent_body, timeout=120.0)
+                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                        if sub_resp.status_code == 200:
+                            d = sub_resp.json()
+                            resp_payload = {
+                                "reply": d.get("reply", ""),
+                                "tools_used": d.get("tools_used", []),
+                                "status": "success",
+                            }
+                            resp_status = 200
+                        else:
+                            resp_payload = {
+                                "reply": f"Agent error ({sub_resp.status_code}): {sub_resp.text}",
+                                "tools_used": [],
+                                "status": "error",
+                            }
+                            resp_status = sub_resp.status_code
+                except Exception as e:
+                    duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                    resp_payload = {
+                        "reply": f"Could not connect to Agent on port {agent_port}: {e}",
+                        "tools_used": [],
+                        "status": "error",
+                    }
+                    resp_status = 502
+            else:
+                messages = req_payload.get("messages") if isinstance(req_payload, dict) else None
+                if not messages:
+                    messages = []
+                    if isinstance(req_payload, dict):
+                        if req_payload.get("system"):
+                            messages.append({"role": "system", "content": req_payload["system"]})
+                        if req_payload.get("prompt"):
+                            messages.append({"role": "user", "content": req_payload["prompt"]})
+
+                openai_body = {
+                    "model": (req_payload.get("model") if isinstance(req_payload, dict) else None) or os.environ.get("MODEL_NAME", "Llama-3.2-3B-Instruct"),
+                    "messages": messages,
+                    "temperature": req_payload.get("temperature", 0.7) if isinstance(req_payload, dict) else 0.7,
+                    "max_tokens": req_payload.get("max_tokens", 512) if isinstance(req_payload, dict) else 512,
+                }
+                sub_headers = {"content-type": "application/json"}
+                auth_hdr = request.headers.get("authorization")
+                if auth_hdr:
+                    sub_headers["authorization"] = auth_hdr
+
+                try:
+                    import httpx
+                    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=request.app), base_url="http://local") as internal_client:
+                        sub_resp = await internal_client.post("/v1/chat/completions", json=openai_body, headers=sub_headers, timeout=120.0)
+                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                        if sub_resp.status_code == 200:
+                            data = sub_resp.json()
+                            reply = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                            resp_payload = {
+                                "reply": reply,
+                                "tools_used": [],
+                                "status": "success",
+                            }
+                            resp_status = 200
+                        else:
+                            resp_payload = {
+                                "reply": f"Model error ({sub_resp.status_code}): {sub_resp.text}",
+                                "tools_used": [],
+                                "status": "error",
+                            }
+                            resp_status = sub_resp.status_code
+                except Exception as e:
+                    duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                    resp_payload = {
+                        "reply": f"Model error: {e}",
+                        "tools_used": [],
+                        "status": "error",
+                    }
+                    resp_status = 500
+
+            log_event({
+                "event_id": f"evt-{uuid.uuid4().hex[:12]}",
+                "request_id": request_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "service": service_name,
+                "from_entity": req_to,
+                "to_entity": req_from,
+                "type": "response",
+                "method": request.method,
+                "status_code": resp_status,
+                "duration_ms": duration_ms,
+                "endpoint": request.url.path,
+                "url": req_url,
+                "http_version": http_proto,
+                "client": client_addr,
+                "client_ip": client_host,
+                "headers": {"content-type": "application/json"},
+                "payload": resp_payload,
+            })
+            return JSONResponse(content=resp_payload, status_code=resp_status)
+
         try:
             response = await call_next(request)
         except Exception as exc:

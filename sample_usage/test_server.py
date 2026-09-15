@@ -2,7 +2,7 @@ import os
 import sys
 import requests
 
-port = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].isdigit() else os.environ.get("PORT", "8001")
+port = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].isdigit() else os.environ.get("PORT", "8000")
 BASE_URL = os.environ.get("OPENAI_BASE_URL", f"http://127.0.0.1:{port}/v1")
 API_KEY = os.environ.get("OPENAI_API_KEY", "your-internal-secure-gateway-token-xyz")
 

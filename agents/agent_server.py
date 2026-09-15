@@ -1,15 +1,20 @@
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 import sys
+import time
+from typing import Any, Optional
+import uuid
+
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from openai import OpenAI
+from pydantic import BaseModel
 import uvicorn
 
 # Default ports
-DEFAULT_LISTEN_PORT = 8002
-DEFAULT_MODEL_PORT = 8001
+DEFAULT_LISTEN_PORT = 8001
+DEFAULT_MODEL_PORT = 8000
 
 MODEL_API_KEY = os.environ.get("MODEL_API_KEY", "your-internal-secure-gateway-token-xyz")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Llama-3.2-3B-Instruct")

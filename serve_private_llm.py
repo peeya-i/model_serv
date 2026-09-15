@@ -319,8 +319,8 @@ if __name__ == "__main__":
     if "-h" in sys.argv or "--help" in sys.argv:
         print("Usage: python serve_private_llm.py [--cli] [-l <port>] [--model <model path or name>]")
         print("\nOptions:")
-        print("  --cli               Run directly in terminal CLI mode (default port: 8001)")
-        print("  -l, --port <port>   Listening port (default: 8000 for Web App, 8001 for --cli)")
+        print("  --cli               Run directly in terminal CLI mode (default port: 8000)")
+        print("  -l, --port <port>   Listening port (default: 8002 for Web App, 8000 for --cli)")
         print("  --model <model>     Model path or name (default: interactive selection)")
         sys.exit(0)
 
@@ -360,7 +360,7 @@ if __name__ == "__main__":
             try:
                 choice = input("Select an option (1-2): ").strip()
                 if choice in ["1", "web", "Start the Web App"]:
-                    web_port = cli_args.port if cli_args.port is not None else int(os.environ.get("PORT", "8000"))
+                    web_port = cli_args.port if cli_args.port is not None else int(os.environ.get("PORT", "8002"))
                     from web_app import start_web_app
                     start_web_app(port=web_port)
                     sys.exit(0)
@@ -375,8 +375,8 @@ if __name__ == "__main__":
     models_dir = os.path.join(project_dir, "models")
     has_model_arg = any(arg == "--model" or arg.startswith("--model=") for arg in sys.argv)
 
-    # When serving the model server via terminal/CLI, default to port 8001 unless overridden
-    default_port = 8001
+    # When serving the model server via terminal/CLI, default to port 8000 unless overridden
+    default_port = 8000
     if cli_args.port is not None:
         listening_port = str(cli_args.port)
     else:

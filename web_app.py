@@ -37,7 +37,7 @@ running_processes = {
     "model": {
         "process": None,
         "model_name": None,
-        "port": 8001,
+        "port": 8000,
         "pid": None,
         "started_at": None,
         "last_exit_code": None,
@@ -46,7 +46,7 @@ running_processes = {
     "agent": {
         "process": None,
         "agent_file": None,
-        "port": 8002,
+        "port": 8001,
         "pid": None,
         "started_at": None,
         "last_exit_code": None,
@@ -56,7 +56,7 @@ running_processes = {
 }
 
 
-def check_model_server_health(port: int = 8001) -> dict[str, Any]:
+def check_model_server_health(port: int = 8000) -> dict[str, Any]:
     """Checks if the vLLM OpenAI-compatible REST server is actively healthy and serving requests."""
     url_health = f"http://127.0.0.1:{port}/health"
     url_models = f"http://127.0.0.1:{port}/v1/models"
@@ -94,7 +94,7 @@ def check_model_server_health(port: int = 8001) -> dict[str, Any]:
     return {"healthy": False, "active_model": None}
 
 
-def check_agent_server_health(port: int = 8002) -> bool:
+def check_agent_server_health(port: int = 8001) -> bool:
     """Checks if the FastAPI agent microservice is healthy and ready to accept requests."""
     try:
         resp = requests.get(f"http://127.0.0.1:{port}/health", timeout=0.8)
@@ -192,7 +192,7 @@ def extract_model_server_error(log_path: str) -> str:
         return f"Error reading log: {e}"
 
 
-def stop_running_agent(port: int = 8002):
+def stop_running_agent(port: int = 8001):
     """Stops any currently running server agent to enforce mutual exclusion (only 1 running at a time)."""
     global running_processes
     # 1. Check running_processes["agent"]
@@ -573,7 +573,7 @@ def get_available_agents_list() -> list[dict[str, Any]]:
                 seen_files.add(fname)
 
                 is_running = (fname == active_file)
-                agent_port = active_agent.get("port", 8002) if is_running else 8002
+                agent_port = active_agent.get("port", 8001) if is_running else 8001
                 desc = "FastAPI HTTP Agent Microservice Front with automated tool reasoning"
                 if "langchain" in fname:
                     desc = "LangChain Python Agent pipeline with sequential tool execution"
@@ -592,28 +592,28 @@ def get_available_agents_list() -> list[dict[str, Any]]:
 # Pydantic Request Models
 class StartModelRequest(BaseModel):
     model: str
-    port: int = 8001
+    port: int = 8000
 
 
 class StopModelRequest(BaseModel):
-    port: Optional[int] = 8001
+    port: Optional[int] = 8000
 
 
 class StartAgentRequest(BaseModel):
     agent_file: str
-    port: int = 8002
-    model_port: int = 8001
+    port: int = 8001
+    model_port: int = 8000
 
 
 class StopAgentRequest(BaseModel):
     agent_file: Optional[str] = None
-    port: Optional[int] = 8002
+    port: Optional[int] = 8001
 
 
 class ChatQueryRequest(BaseModel):
     prompt: str
     target: str = "agent"  # "agent" or "model"
-    port: int = 8002
+    port: int = 8001
     model: Optional[str] = None
     temperature: Optional[float] = 0.7
 
@@ -647,7 +647,7 @@ def api_status():
     # --- Model Server Status Evaluation ---
     model_info = running_processes["model"]
     model_proc = model_info.get("process")
-    model_port = model_info.get("port", 8001)
+    model_port = model_info.get("port", 8000)
     model_state = "stopped"
     model_pid = None
     elapsed_sec = None
@@ -697,7 +697,7 @@ def api_status():
     # --- Agent Server Status Evaluation ---
     agent_info = running_processes["agent"]
     agent_proc = agent_info.get("process")
-    agent_port = agent_info.get("port", 8002)
+    agent_port = agent_info.get("port", 8001)
     agent_state = "stopped"
     agent_pid = None
     agent_elapsed = None
@@ -830,7 +830,7 @@ def api_start_model(req: StartModelRequest):
 @app.post("/api/model/stop")
 def api_stop_model(req: Optional[StopModelRequest] = None):
     global running_processes
-    port_to_stop = req.port if (req and req.port) else running_processes["model"].get("port", 8001)
+    port_to_stop = req.port if (req and req.port) else running_processes["model"].get("port", 8000)
 
     # 1. Terminate tracked model subprocess if running
     proc = running_processes["model"].get("process")
@@ -942,7 +942,7 @@ def api_start_agent(req: StartAgentRequest):
 
 @app.post("/api/agent/stop")
 def api_stop_agent(req: Optional[StopAgentRequest] = None):
-    target_port = req.port if (req and req.port) else running_processes["agent"].get("port", 8002)
+    target_port = req.port if (req and req.port) else running_processes["agent"].get("port", 8001)
     stopped_name = running_processes["agent"].get("agent_file") or (req.agent_file if req else "agent")
     stop_running_agent(target_port)
     return {"status": "stopped", "message": f"Agent '{stopped_name}' stopped"}
@@ -1143,13 +1143,13 @@ def get_model_start_timestamp() -> Optional[float]:
         except Exception:
             pass
 
-    # 3. If model server is active on port 8001, retrieve process start time
+    # 3. If model server is active on port 8000, retrieve process start time
     try:
-        health = check_model_server_health(running_processes["model"].get("port", 8001))
+        health = check_model_server_health(running_processes["model"].get("port", 8000))
         if health["healthy"]:
             try:
                 out = subprocess.check_output(
-                    ["lsof", "-ti", f":{running_processes['model'].get('port', 8001)}"],
+                    ["lsof", "-ti", f":{running_processes['model'].get('port', 8000)}"],
                     text=True,
                     stderr=subprocess.DEVNULL,
                 )
@@ -1441,11 +1441,11 @@ def index_page():
     return HTMLResponse(content=load_html_content())
 
 
-def start_web_app(port: int = 8000, host: str = "127.0.0.1"):
+def start_web_app(port: int = 8002, host: str = "127.0.0.1"):
     """Starts the web app console server."""
     try:
         from serve_private_llm import check_and_notify_existing_instances
-        check_and_notify_existing_instances(target_ports=[port, 8001, 8002])
+        check_and_notify_existing_instances(target_ports=[port, 8000, 8001])
     except Exception:
         pass
     print("\n" + "=" * 62)
@@ -1455,7 +1455,7 @@ def start_web_app(port: int = 8000, host: str = "127.0.0.1"):
 
 
 if __name__ == "__main__":
-    port = 8000
+    port = 8002
     if len(sys.argv) > 1 and sys.argv[1].isdigit():
         port = int(sys.argv[1])
     start_web_app(port=port)

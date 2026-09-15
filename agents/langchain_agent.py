@@ -15,8 +15,8 @@ from langchain_openai import ChatOpenAI
 import requests
 
 # 1. Default ports and configuration
-DEFAULT_LISTEN_PORT = 8002
-DEFAULT_MODEL_PORT = 8001
+DEFAULT_LISTEN_PORT = 8001
+DEFAULT_MODEL_PORT = 8000
 MODEL_API_KEY = os.environ.get("MODEL_API_KEY", "your-internal-secure-gateway-token-xyz")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Llama-3.2-3B-Instruct")
 

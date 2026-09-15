@@ -7,9 +7,9 @@ An air-gapped, high-performance local AI inference and agent server powered by *
 ## 🏛 System Architecture
 
 This repository provides three primary ways to interact with your local models and agents:
-1. **Interactive Web App Dashboard (Port 8000)**: A full-featured web console featuring server-side agent management with mutual exclusion, model selection dropdown with custom text input, real-time GPU hardware inspection, an interactive chat playground, and a live event log viewer.
-2. **Direct Mode (Without Agent - Port 8001)**: Applications query the local OpenAI-compatible vLLM inference engine directly on port `8001` (ideal for private RAG pipelines, text generation, and direct prompt completion).
-3. **Agent Mode (Server Agent Front - Port 8002)**: An intelligent microservice layer in `agents/` that inspects user queries, automatically selects and executes local tools (calculators, system status diagnostics, timestamps), and synthesizes tool outputs before returning answers.
+1. **Interactive Web App Dashboard (Port 8002)**: A full-featured web console featuring server-side agent management with mutual exclusion, model selection dropdown with custom text input, real-time GPU hardware inspection, an interactive chat playground, and a live event log viewer.
+2. **Direct Mode (Without Agent - Port 8000)**: Applications query the local OpenAI-compatible vLLM inference engine directly on port `8000` (ideal for private RAG pipelines, text generation, and direct prompt completion).
+3. **Agent Mode (Server Agent Front - Port 8001)**: An intelligent microservice layer in `agents/` that inspects user queries, automatically selects and executes local tools (calculators, system status diagnostics, timestamps), and synthesizes tool outputs before returning answers.
 
 ```
                   ┌─────────────────────────────────────────────────────────────┐
@@ -18,11 +18,11 @@ This repository provides three primary ways to interact with your local models a
                                  │                               │
         [Option A: Direct Mode]  │                               │ [Option B: Agent Mode]
         OpenAI REST Requests     │                               │ HTTP REST Requests
-        (Port 8001 /v1)          │                               │ (Port 8002 /agent/chat)
+        (Port 8000 /v1)          │                               │ (Port 8001 /agent/chat)
                                  │                               ▼
                                  │                ┌──────────────────────────────┐
                                  │                │    Local Agent Server Front  │
-                                 │                │ (agents/agent_server.py:8002)│
+                                 │                │ (agents/agent_server.py:8001)│
                                  │                │   - Tool Registry            │
                                  │                │   - Execution & Reason Loop  │
                                  │                └──────────────┬───────────────┘
@@ -30,7 +30,7 @@ This repository provides three primary ways to interact with your local models a
                                  ▼                               ▼
                  ┌───────────────────────────────────────────────────────────────┐
                  │       Local vLLM Model Server (serve_private_llm.py)          │
-                 │                    Port 8001 (`/v1`)                          │
+                 │                    Port 8000 (`/v1`)                          │
                  │         Model: Meta Llama-3.2-3B-Instruct                     │
                  │  - Air-gapped offline operation (Zero telemetry/external calls)│
                  │  - Structured logging to logs/events.json (100MB FIFO capped) │
@@ -45,9 +45,9 @@ This repository provides three primary ways to interact with your local models a
 
 | Setting | Value | Notes |
 |---|---|---|
-| **Web App Dashboard** | `http://127.0.0.1:8000` | 3-tab web console for agents, models, chat, logs, and GPU metrics |
-| **Model Server URL** | `http://127.0.0.1:8001/v1` | OpenAI-compatible REST API powered by vLLM |
-| **Agent Server URL** | `http://127.0.0.1:8002` | FastAPI tool-augmented agent microservice (`agents/agent_server.py`) |
+| **Web App Dashboard** | `http://127.0.0.1:8002` | 3-tab web console for agents, models, chat, logs, and GPU metrics |
+| **Model Server URL** | `http://127.0.0.1:8000/v1` | OpenAI-compatible REST API powered by vLLM |
+| **Agent Server URL** | `http://127.0.0.1:8001` | FastAPI tool-augmented agent microservice (`agents/agent_server.py`) |
 | **Model Engine** | `vLLM 0.28.0` | High-throughput async PagedAttention engine |
 | **Default Model** | `Llama-3.2-3B-Instruct` | Local weights in `./models/Llama-3.2-3B-Instruct` |
 | **API Key** | `your-internal-secure-gateway-token-xyz` | Token bearer authentication |
@@ -228,24 +228,24 @@ Running without arguments prompts you to select between the **Web App Console** 
 Select an option (1-2): 
 ```
 
-##### Option [1]: Web App Console (`http://127.0.0.1:8000`)
-Launches the full 3-page web dashboard on port `8000` (or specified `-l <port>`):
+##### Option [1]: Web App Console (`http://127.0.0.1:8002`)
+Launches the full 3-page web dashboard on port `8002` (or specified `-l <port>`):
 - **Tab 1: Server & Agents**:
   - **Server-Side Agent Selection (Dropdown)**:
     - Lists all agent microservice scripts discovered in `agents/` (`agent_server.py`, `langchain_agent.py`).
     - **Single Running Agent Rule (Mutual Exclusion)**: Only 1 server agent can be running at a time. Starting or switching to a new agent automatically terminates any previously running agent cleanly.
-    - Configurable agent listening port (default: `8002`).
+    - Configurable agent listening port (default: `8001`).
     - Dynamic action button: **"Enable Agent"** (Emerald) when stopped, **"Disable Agent"** (Rose) when currently running, or **"Switch to this Agent"** (Indigo) when a different agent is selected while one is active.
     - Live status badge showing active agent filename, port, and process ID (PID).
   - **Local Model Inference Engine (Dropdown + Text Box)**:
     - **Dropdown choice**: Lists discovered local weights in `models/` (e.g. `Llama-3.2-3B-Instruct`) and Hugging Face cached repositories, plus a `Custom Model (Enter in text box)...` option.
     - **Editable Text Box**: Shows the chosen model path and allows typing/editing any custom local directory path or remote Hugging Face repository (with bidirectional dropdown synchronization).
-    - Configurable model server listening port (default: `8001`).
+    - Configurable model server listening port (default: `8000`).
     - **Real-Time Active Readiness Verification**: Rather than falsely reporting "running" the moment a process spawns, the backend performs live HTTP readiness checks against `http://127.0.0.1:<port>/health` and `/v1/models`.
     - **Distinct Lifecycle States & Indicators**:
       - ⚪ **Stopped**: Gray badge (`Server Stopped`), action button: **"▶ Enable Model"**.
       - ⏳ **Loading / Initializing**: Amber pulsing badge (`⏳ Initializing & Loading Weights (~14s)...`), action button: **"⏳ Starting... (Click to Abort)"**, detailed status noting weight loading into memory and KV cache warmup. Frontend dynamically polls every 1.5s for immediate responsiveness.
-      - 🟢 **Actively Running & Ready**: Vibrant emerald green pulsing badge (`● Actively Serving: <model_name> (:8001, PID: ...)`), action button: **"⏹ Stop Model Server"**, and live REST endpoint indicator.
+      - 🟢 **Actively Running & Ready**: Vibrant emerald green pulsing badge (`● Actively Serving: <model_name> (:8000, PID: ...)`), action button: **"⏹ Stop Model Server"**, and live REST endpoint indicator.
       - ❌ **Crashed / Terminated**: Rose red badge (`Process Terminated (Exit: ...)`) with error log snippet preview.
     - **Persistent Top Navigation Pill**: A dedicated status indicator in the top navbar (`LLM: Actively Serving` / `LLM: Loading` / `LLM: Stopped`) provides immediate visibility across all 3 tabs.
   - **GPU Hardware & Compute Capabilities Panel** (prominently displayed below model selection):
@@ -255,20 +255,20 @@ Launches the full 3-page web dashboard on port `8000` (or specified `-l <port>`)
     - **Number of GPUs**: Detected PCIe accelerator count.
     - **RAM Available on GPU (VRAM)**: Real-time free vs total VRAM metrics with visual animated meter bar and 3GB system RAM CPU offload indication.
 - **Tab 2: Chat Console**:
-  - Interactive playground allowing prompt execution against either the active **Server Agent** (port `8002`) or directly to the **Model Server** (port `8001`).
-  - Target readiness badge displays live availability (`Direct Model Ready (:8001)` vs `Model Loading Weights...` vs `Model Offline`).
+  - Interactive playground allowing prompt execution against either the active **Server Agent** (port `8001`) or directly to the **Model Server** (port `8000`).
+  - Target readiness badge displays live availability (`Direct Model Ready (:8000)` vs `Model Loading Weights...` vs `Model Offline`).
   - Prevents querying unready models with clear, helpful alerts if the server is still warming up.
   - Automatically displays executed tools and arguments when querying via the agent front.
 - **Tab 3: Event Logs**:
   - Real-time tabular viewer for `logs/events.json`. Displays timestamps, service badges (`agent_server`, `langchain_agent`, `model_server`), route endpoints, HTTP status codes, durations, and complete expandable JSON request/response payloads.
 
 ##### Option [2]: Terminal CLI
-Continues with interactive terminal model selection from the `models/` directory, defaulting to port `8001`.
+Continues with interactive terminal model selection from the `models/` directory, defaulting to port `8000`.
 
 ---
 
 #### 2. Direct CLI Launch (`--cli`)
-Passing `--cli` skips the interactive prompt, defaults to port `8001`, and directly opens the terminal model selection menu:
+Passing `--cli` skips the interactive prompt, defaults to port `8000`, and directly opens the terminal model selection menu:
 ```bash
 ./.venv/bin/python serve_private_llm.py --cli
 ```
@@ -279,7 +279,7 @@ Passing `--cli` skips the interactive prompt, defaults to port `8001`, and direc
 | :--- | :--- | :--- | :--- |
 | `--cli` | — | Run directly in terminal CLI mode | Interactive Choice |
 | `--model <model>` | — | Model path or Hugging Face model identifier | Interactive Menu |
-| `--port <port>` | `-l <port>` | Listening port | `8000` (Web App) / `8001` (`--cli`) |
+| `--port <port>` | `-l <port>` | Listening port | `8002` (Web App) / `8000` (`--cli`) |
 
 #### Usage Examples
 
@@ -314,7 +314,7 @@ Select an option (1-3):
 ./.venv/bin/python serve_private_llm.py --cli --model "TinyLlama/TinyLlama-1.1B-Chat-v1.0" -l 8500
 ```
 
-*The model server initializes weights, offloads 3GB to system RAM, sets up Triton attention, and listens on `http://127.0.0.1:<port>/v1` (default: 8001).*
+*The model server initializes weights, offloads 3GB to system RAM, sets up Triton attention, and listens on `http://127.0.0.1:<port>/v1` (default: 8000).*
 
 ---
 
@@ -333,11 +333,11 @@ Open a separate terminal and run:
 
 **Expected Output:**
 ```text
-Checking GET http://127.0.0.1:8001/v1/models ...
+Checking GET http://127.0.0.1:8000/v1/models ...
 Status Code: 200
 Response: {'data': [{'id': 'Llama-3.2-3B-Instruct', 'max_model_len': 4096, ...}]}
 
-Sending test prompt to POST http://127.0.0.1:8001/v1/chat/completions ...
+Sending test prompt to POST http://127.0.0.1:8000/v1/chat/completions ...
 Status Code: 200
 Generated Message: Private LLM server is up and running!
 ```
@@ -345,7 +345,7 @@ Generated Message: Private LLM server is up and running!
 ### 2. Direct Query via `curl`
 
 ```bash
-curl -X POST http://127.0.0.1:8001/v1/chat/completions \
+curl -X POST http://127.0.0.1:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-internal-secure-gateway-token-xyz" \
   -d '{
@@ -363,7 +363,7 @@ curl -X POST http://127.0.0.1:8001/v1/chat/completions \
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://127.0.0.1:8001/v1",
+    base_url="http://127.0.0.1:8000/v1",
     api_key="your-internal-secure-gateway-token-xyz"
 )
 
@@ -390,7 +390,7 @@ When you need the model to autonomously reason, decide when external data or act
 
 ### Option 1: FastAPI Microservice Front (`agents/agent_server.py`)
 
-A persistent HTTP service listening on port `8002`. It receives user prompts, passes them to the local model alongside registered tool schemas, intercepts function calls, executes the local Python functions, and returns the synthesized answer.
+A persistent HTTP service listening on port `8001`. It receives user prompts, passes them to the local model alongside registered tool schemas, intercepts function calls, executes the local Python functions, and returns the synthesized answer.
 
 #### Available Tools
 - `calculate(expression)`: Mathematical calculations.
@@ -399,17 +399,17 @@ A persistent HTTP service listening on port `8002`. It receives user prompts, pa
 #### 1. Start the Agent Server
 In a separate terminal (or launch directly from Web App Tab 1):
 
-**Default ports (listen: 8002, model: 8001):**
+**Default ports (listen: 8001, model: 8000):**
 ```bash
 ./.venv/bin/python agents/agent_server.py
 ```
 
 **Custom ports (specify listening port `-l` and/or model server port `-m`):**
 ```bash
-# Listen on 8002, connect to model server on custom port 8500
+# Listen on 8001, connect to model server on custom port 8500
 ./.venv/bin/python agents/agent_server.py -m 8500
 
-# Listen on custom port 9002, connect to model server on default port 8001
+# Listen on custom port 9002, connect to model server on default port 8000
 ./.venv/bin/python agents/agent_server.py -l 9002
 
 # Specify both listening and model ports
@@ -418,7 +418,7 @@ In a separate terminal (or launch directly from Web App Tab 1):
 
 #### 2. Check Agent Health
 ```bash
-curl -s http://127.0.0.1:8002/health
+curl -s http://127.0.0.1:8001/health
 ```
 
 **Response:**
@@ -428,7 +428,7 @@ curl -s http://127.0.0.1:8002/health
 
 #### 3. Send a Tool-Requiring Prompt to the Agent Front
 ```bash
-curl -X POST http://127.0.0.1:8002/agent/chat \
+curl -X POST http://127.0.0.1:8001/agent/chat \
   -H "Content-Type: application/json" \
   -d '{"prompt": "What is 45 * 20?"}'
 ```
@@ -493,12 +493,12 @@ All requests and responses entering and leaving the LLM server, agent microservi
 
 ## 📊 Agent Options Comparison
 
-| Feature | Direct Mode (`:8001`) | Option 1: `agents/agent_server.py` (`:8002`) | Option 2: `agents/langchain_agent.py` |
+| Feature | Direct Mode (`:8000`) | Option 1: `agents/agent_server.py` (`:8001`) | Option 2: `agents/langchain_agent.py` |
 |---|---|---|---|
 | **Role** | Raw LLM Inference Engine | Front-end Agent Microservice | Python Agent Pipeline |
 | **Tools / Skills** | None (Raw Completion) | `calculate`, `lookup_system_status` | `get_current_time`, `calculate` |
 | **Interface** | OpenAI REST API (`/v1`) | REST API (`/agent/chat`, `/health`) | Python Function / CLI |
-| **Protocol** | HTTP on `:8001` | HTTP on `:8002` | In-process Python invocation |
+| **Protocol** | HTTP on `:8000` | HTTP on `:8001` | In-process Python invocation |
 | **Best For** | Private RAG, embeddings, direct completions | Web frontends, mobile apps, microservices | Python workflows, notebooks, pipelines |
 
 ---
@@ -510,11 +510,11 @@ All requests and responses entering and leaving the LLM server, agent microservi
 - If running in background:
   - **Linux / macOS**:
     ```bash
-    kill $(lsof -t -i:8002)
+    kill $(lsof -t -i:8001)
     ```
   - **Windows (PowerShell)**:
     ```powershell
-    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8002).OwningProcess -Force
+    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8001).OwningProcess -Force
     ```
 
 ### 2. Stopping the Model Server (`serve_private_llm.py`)
@@ -523,11 +523,11 @@ All requests and responses entering and leaving the LLM server, agent microservi
   - **Linux / macOS**:
     ```bash
     pkill -f "serve_private_llm.py"
-    # Or: kill $(lsof -t -i:8001)
+    # Or: kill $(lsof -t -i:8000)
     ```
   - **Windows (PowerShell)**:
     ```powershell
-    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8001).OwningProcess -Force
+    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8000).OwningProcess -Force
     ```
 
 ### 3. Stopping the Web App Console (`web_app.py`)
@@ -535,11 +535,11 @@ All requests and responses entering and leaving the LLM server, agent microservi
 - If running in background:
   - **Linux / macOS**:
     ```bash
-    kill $(lsof -t -i:8000)
+    kill $(lsof -t -i:8002)
     ```
   - **Windows (PowerShell)**:
     ```powershell
-    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8000).OwningProcess -Force
+    Stop-Process -Id (Get-NetTCPConnection -LocalPort 8002).OwningProcess -Force
     ```
 
 ---
